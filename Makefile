@@ -1,14 +1,20 @@
 DEF= -DCPU -D___PERIODIC -D___SIGMOID -D___NCX
 
-CXX=g++
+CXX=g++-9
 CXXFLAGS=-O3 -fopenmp
 
 
-uc: uc.o cell.o ap.o recsubcell.o subcell.o log.o
-	$(CXX) -o $@ $(CXXFLAGS) uc.o cell.o ap.o recsubcell.o subcell.o log.o
+SRC_DIR := ./lib
+OBJ_DIR := ./obj
+SRC_FILES := $(wildcard $(SRC_DIR)/*.cc)
+OBJ_FILES := $(patsubst $(SRC_DIR)/%.cc,$(OBJ_DIR)/%.o,$(SRC_FILES))
 
-.cc.o:
-	$(CXX) -c -MMD -MP $< $(CXXFLAGS) $(DEF)
+uc: uc.cc $(OBJ_FILES)
+	$(CXX) $(CXXFLAGS) $(DEF) -o $@ $^ 
 
-clean:
-	rm *.o uc
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc
+	$(CXX) $(CXXFLAGS) $(DEF) -c -o $@ $< 
+
+
+clean: 
+	rm $(OBJ_FILES) uc

@@ -10,10 +10,10 @@
 #include <iomanip>
 #include <fstream>
 using namespace std;
-#include "subcell.h"
-#include "recsubcell.h"
-#include "ap.h"
-#include "log.h"
+#include "lib/subcell.h"
+#include "lib/recsubcell.h"
+#include "lib/ap.h"
+#include "lib/log.h"
 
 inline unsigned int xorshift2(unsigned int *xx, unsigned int *yy, unsigned int *zz, unsigned int *ww)
 {
@@ -155,8 +155,9 @@ int main(int argc, char* argv[]) {
 
       double t_relative = (tn%(int(pcl/dt)))*dt;
 
+      sc.pace(-80, 12.0);
       // std::cout << "Before VC" << std::endl;
-      sc.voltage_clamp(t, 20, true);
+      // sc.voltage_clamp(t, 20, true);
       // std::cout << "After VC" << std::endl;
 
     // sc.pace(v, 12.0);
