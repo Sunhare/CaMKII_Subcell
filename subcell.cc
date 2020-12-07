@@ -157,44 +157,44 @@ void CSubcell::init(double initci, double initcj)
   cati=new double [nn];
   //  cats=new double [nn];
 
-#ifdef ___DETERMINISTIC
-  c1=new double [n];
-  c2=new double [n];
-  i1ca=new double [n];
-  i1ba=new double [n];
-  i2ca=new double [n];
-  i2ba=new double [n];
+  #ifdef ___DETERMINISTIC
+    c1=new double [n];
+    c2=new double [n];
+    i1ca=new double [n];
+    i1ba=new double [n];
+    i2ca=new double [n];
+    i2ba=new double [n];
 
-  fryr1=new double [n];
-  fryr2=new double [n];
-  fryr3=new double [n];
-#else
-  y=new int [n*NoCaL];
-  ryr1=new int [n];
-  ryr2=new int [n];
-  ryr3=new int [n];
-  nryr=new int [n];
-#endif
+    fryr1=new double [n];
+    fryr2=new double [n];
+    fryr3=new double [n];
+  #else
+    y=new int [n*NoCaL];
+    ryr1=new int [n];
+    ryr2=new int [n];
+    ryr3=new int [n];
+    nryr=new int [n];
+  #endif
 
-  vp=new double [n];
-  Jmaxx=new double [n];
-  cscp1=new double [nn];
-  cscp2=new double [nn];
+    vp=new double [n];
+    Jmaxx=new double [n];
+    cscp1=new double [nn];
+    cscp2=new double [nn];
 
-  Ici=new double [nn];
-  Icnsr=new double [nn];
+    Ici=new double [nn];
+    Icnsr=new double [nn];
 
-#ifdef ___NO_CS_BUFFER
-  csmn=new double [nn];
-#else
-  Ics=new double [nn];
-  Idps=new double [nn];
-#endif
+  #ifdef ___NO_CS_BUFFER
+    csmn=new double [nn];
+  #else
+    Ics=new double [nn];
+    Idps=new double [nn];
+  #endif
 
-#ifdef ___EGTA
-  caEGTAi=new double [nn];
-  caEGTAs=new double [nn];
-#endif
+  #ifdef ___EGTA
+    caEGTAi=new double [nn];
+    caEGTAs=new double [nn];
+  #endif
 
 
   Itr=new double [nn];
@@ -206,99 +206,100 @@ void CSubcell::init(double initci, double initcj)
   xsy=new unsigned int [n];
   xsz=new unsigned int [n];
   xsw=new unsigned int [n];
-#pragma ivdep
-#pragma vector always
-  for (int id=0;id<n;id++)
-  {
-    xsx[id]=123456789+id+seed;
-    xsy[id]=362436069+id*100+seed*10;
-    xsz[id]=521288629+id*1000+seed*100;
-    xsw[id]=88675123+id*10000+seed*1000;
-    for (int i=0;i<1000;i++)
-      xorshift(&xsx[id], &xsy[id], &xsz[id], &xsw[id]);
-  }
+  #pragma ivdep
+  #pragma vector always
+    for (int id=0;id<n;id++)
+    {
+      xsx[id]=123456789+id+seed;
+      xsy[id]=362436069+id*100+seed*10;
+      xsz[id]=521288629+id*1000+seed*100;
+      xsw[id]=88675123+id*10000+seed*1000;
+      for (int i=0;i<1000;i++)
+        xorshift(&xsx[id], &xsy[id], &xsz[id], &xsw[id]);
+    }
 
-  //initial conditions
+    //initial conditions
 
-#pragma ivdep
-#pragma vector always
-  for (int id=0;id<nn;id++)
-  {
-    ci[id]=initci;
-    cs[id]=initci;
-    cnsr[id]=initcj;
-    Icnsr[id]=0;
+  #pragma ivdep
+  #pragma vector always
+    for (int id=0;id<nn;id++)
+    {
+      ci[id]=initci;
+      cs[id]=initci;
+      cnsr[id]=initcj;
+      Icnsr[id]=0;
 
-#ifdef ___NO_CS_BUFFER
-    csmn[id]=0;
-#else
-    Ics[id]=0;
-    Idps[id]=0;
-#endif
+  #ifdef ___NO_CS_BUFFER
+      csmn[id]=0;
+  #else
+      Ics[id]=0;
+      Idps[id]=0;
+  #endif
 
-    Ici[id]=0;
+      Ici[id]=0;
 
-    cscp1[id]=0;
-    cscp2[id]=0;
-    Itr[id]=0;
-  }
-  resetBuffer();
-#pragma ivdep
-#pragma vector always
-  for (int id=0;id<n;id++)
-  {
-    Jmaxx[id]=Jmax;
-    cp[id]=initci;
-    cjsr[id]=initcj;
-#ifdef ___DETERMINISTIC
-    c1[id]=1;
-    c2[id]=0;
-    i1ca[id]=0;
-    i1ba[id]=0;
-    i2ca[id]=0;
-    i2ba[id]=0;
+      cscp1[id]=0;
+      cscp2[id]=0;
+      Itr[id]=0;
+    }
+    resetBuffer();
+  #pragma ivdep
+  #pragma vector always
+    for (int id=0;id<n;id++)
+    {
+      Jmaxx[id]=Jmax;
+      cp[id]=initci;
+      cjsr[id]=initcj;
+  #ifdef ___DETERMINISTIC
+      c1[id]=1;
+      c2[id]=0;
+      i1ca[id]=0;
+      i1ba[id]=0;
+      i2ca[id]=0;
+      i2ba[id]=0;
 
-    fryr1[id]=0.03;
-    fryr2[id]=0;
-    fryr3[id]=0;
+      fryr1[id]=0.03;
+      fryr2[id]=0;
+      fryr3[id]=0;
 
-#else
-    ryr1[id]=0+int(5.0*xorshift(&xsx[id], &xsy[id], &xsz[id], &xsw[id])/(double)(UINT_MAX));
-    ryr2[id]=0;
-    ryr3[id]=0;
-    nryr[id]=100;
-    for (int j=0;j<NoCaL;j++)
-      y[id*NoCaL+j]=2;
-#endif
+  #else
+      ryr1[id]=0+int(5.0*xorshift(&xsx[id], &xsy[id], &xsz[id], &xsw[id])/(double)(UINT_MAX));
+      ryr2[id]=0;
+      ryr3[id]=0;
+      nryr[id]=100;
+      for (int j=0;j<NoCaL;j++)
+        y[id*NoCaL+j]=2;
+  #endif
 
-#ifdef ___UNIFORM
-    double r=0;
-#else
-    double r=calcvp(0,0.3,-0.8,0.8,id);//Gaussian distribution (0,0.3) range(-0.8~0.8)
-#endif
-    vp[id]=vp_ave*(1+r);
+  #ifdef ___UNIFORM
+      double r=0;
+  #else
+      double r=calcvp(0,0.3,-0.8,0.8,id);//Gaussian distribution (0,0.3) range(-0.8~0.8)
+  #endif
+      vp[id]=vp_ave*(1+r);
 
-    int kk=id/nxny;
-    kk=kk*finemesh+finemesh/2;
-    int modi=id%nxny;
-    int jj=modi/nx;
-    jj=jj*finemesh+finemesh/2;
-    int ii=modi%nx;
-    ii=ii*finemesh+finemesh/2;
-    crupos[id]=ii+jj*nnx+kk*nnxnny;
+      int kk=id/nxny;
+      kk=kk*finemesh+finemesh/2;
+      int modi=id%nxny;
+      int jj=modi/nx;
+      jj=jj*finemesh+finemesh/2;
+      int ii=modi%nx;
+      ii=ii*finemesh+finemesh/2;
+      crupos[id]=ii+jj*nnx+kk*nnxnny;
 
-    cscp2[crupos[id]]=1/taup*vp[id]/vs;
+      cscp2[crupos[id]]=1/taup*vp[id]/vs;
 
-  }
+    }
 
-  iupave=icaave=incxave=irave=ileakave=icabkave=islcapave=0;
-  initialized=true;
+    iupave=icaave=incxave=irave=ileakave=icabkave=islcapave=0;
+    initialized=true;
 }
+
 void CSubcell::srand(int sed)
 {
   seed=sed;
-#pragma ivdep
-#pragma vector always
+  #pragma ivdep
+  #pragma vector always
   for (int id=0;id<n;id++)
   {
     xsx[id]=123456789+id+seed;
@@ -326,24 +327,24 @@ void CSubcell::delarray(void)
   delete [] cjsr;
   delete [] cnsr;
 
-#ifdef ___DETERMINISTIC
-  delete [] c1;
-  delete [] c2;
-  delete [] i1ca;
-  delete [] i1ba;
-  delete [] i2ca;
-  delete [] i2ba;
+  #ifdef ___DETERMINISTIC
+    delete [] c1;
+    delete [] c2;
+    delete [] i1ca;
+    delete [] i1ba;
+    delete [] i2ca;
+    delete [] i2ba;
 
-  delete [] fryr1;
-  delete [] fryr2;
-  delete [] fryr3;
-#else
-  delete [] ryr1;
-  delete [] ryr2;
-  delete [] ryr3;
-  delete [] nryr;
-  delete [] y;
-#endif
+    delete [] fryr1;
+    delete [] fryr2;
+    delete [] fryr3;
+  #else
+    delete [] ryr1;
+    delete [] ryr2;
+    delete [] ryr3;
+    delete [] nryr;
+    delete [] y;
+  #endif
 
   delete [] cati;
   //      delete [] cats;
@@ -357,12 +358,13 @@ void CSubcell::delarray(void)
   delete [] Ici;
   delete [] Icnsr;
 
-#ifdef ___NO_CS_BUFFER
-  delete [] csmn;
-#else
-  delete [] Ics;
-  delete [] Idps;
-#endif
+  #ifdef ___NO_CS_BUFFER
+    delete [] csmn;
+  #else
+    delete [] Ics;
+    delete [] Idps;
+  #endif
+
   delete [] crupos;
 
   delete [] xsx;
@@ -420,9 +422,9 @@ CSubcell& CSubcell::operator=(const CSubcell& sc)
   pedk43=sc.pedk43;
   //#endif
   NoCaL=sc.NoCaL;
-#ifdef ___NCX
-  NCXalpha=sc.NCXalpha;
-#endif
+  #ifdef ___NCX
+    NCXalpha=sc.NCXalpha;
+  #endif
 
   MaxSR=sc.MaxSR;
   MinSR=sc.MinSR;
@@ -433,60 +435,60 @@ CSubcell& CSubcell::operator=(const CSubcell& sc)
   init();
 
   //initial conditions
-#pragma ivdep
-#pragma vector always
-  for (int id=0;id<nn;id++)
-  {
-    ci[id]=sc.ci[id];
-    cs[id]=sc.cs[id];
-    cati[id]=sc.cati[id];
-    //      cats[id]=sc.cats[id];
-    cnsr[id]=sc.cnsr[id];
-    Icnsr[id]=sc.Icnsr[id];
-#ifdef ___NO_CS_BUFFER
-    csmn[id]=sc.csmn[id];
-#else
-    Ics[id]=sc.Ics[id];
-    Idps[id]=sc.Idps[id];
-#endif
+  #pragma ivdep
+  #pragma vector always
+    for (int id=0;id<nn;id++)
+    {
+      ci[id]=sc.ci[id];
+      cs[id]=sc.cs[id];
+      cati[id]=sc.cati[id];
+      //      cats[id]=sc.cats[id];
+      cnsr[id]=sc.cnsr[id];
+      Icnsr[id]=sc.Icnsr[id];
+  #ifdef ___NO_CS_BUFFER
+      csmn[id]=sc.csmn[id];
+  #else
+      Ics[id]=sc.Ics[id];
+      Idps[id]=sc.Idps[id];
+  #endif
 
-    cscp1[id]=sc.cscp1[id];
-    cscp2[id]=sc.cscp2[id];
-    Itr[id]=sc.Itr[id];
-  }
-#pragma ivdep
-#pragma vector always
-  for (int id=0;id<n;id++)
-  {
-    Jmaxx[id]=sc.Jmaxx[id];
-    cp[id]=sc.cp[id];
-    cjsr[id]=sc.cjsr[id];
-#ifdef ___DETERMINISTIC
-    c1[id]=sc.c1[id];
-    c2[id]=sc.c2[id];
-    i1ca[id]=sc.i1ca[id];
-    i1ba[id]=sc.i1ba[id];
-    i2ca[id]=sc.i2ca[id];
-    i2ba[id]=sc.i2ba[id];
+      cscp1[id]=sc.cscp1[id];
+      cscp2[id]=sc.cscp2[id];
+      Itr[id]=sc.Itr[id];
+    }
+  #pragma ivdep
+  #pragma vector always
+    for (int id=0;id<n;id++)
+    {
+      Jmaxx[id]=sc.Jmaxx[id];
+      cp[id]=sc.cp[id];
+      cjsr[id]=sc.cjsr[id];
+  #ifdef ___DETERMINISTIC
+      c1[id]=sc.c1[id];
+      c2[id]=sc.c2[id];
+      i1ca[id]=sc.i1ca[id];
+      i1ba[id]=sc.i1ba[id];
+      i2ca[id]=sc.i2ca[id];
+      i2ba[id]=sc.i2ba[id];
 
-    fryr1[id]=sc.fryr1[id];
-    fryr2[id]=sc.fryr2[id];
-    fryr3[id]=sc.fryr3[id];
-#else
-    ryr1[id]=sc.ryr1[id];
-    ryr2[id]=sc.ryr2[id];
-    ryr3[id]=sc.ryr3[id];
-    nryr[id]=sc.nryr[id];
-    for (int j=0;j<NoCaL;j++)
-      y[id*NoCaL+j]=sc.y[id*NoCaL+j];
-#endif
+      fryr1[id]=sc.fryr1[id];
+      fryr2[id]=sc.fryr2[id];
+      fryr3[id]=sc.fryr3[id];
+  #else
+      ryr1[id]=sc.ryr1[id];
+      ryr2[id]=sc.ryr2[id];
+      ryr3[id]=sc.ryr3[id];
+      nryr[id]=sc.nryr[id];
+      for (int j=0;j<NoCaL;j++)
+        y[id*NoCaL+j]=sc.y[id*NoCaL+j];
+  #endif
     vp[id]=sc.vp[id];
     cscp2[crupos[id]]=sc.cscp2[crupos[id]];
     Ici[id]=sc.Ici[id];
   }
 
-#pragma ivdep
-#pragma vector always
+  #pragma ivdep
+  #pragma vector always
   for (int id=0;id<n;id++)
   {
     xsx[id]=sc.xsx[id];
@@ -501,16 +503,16 @@ void CSubcell::pace(double v, double nai)
 {
   iupave=icaave=incxave=irave=ileakave=icabkave=islcapave=0;
 
-#ifndef ___NO_DIFFUSION
-  //set diffusion terms
-  computeIci();//diffusion ci
-  computeIcnsr();//diffusion cnsr
-#ifdef ___NO_CS_BUFFER
-  computecsmn();//diffusion cs
-#else
-  computeIcs();//diffusion cs
-#endif
-#endif
+  #ifndef ___NO_DIFFUSION
+      //set diffusion terms
+      computeIci();//diffusion ci
+      computeIcnsr();//diffusion cnsr
+    #ifdef ___NO_CS_BUFFER
+      computecsmn();//diffusion cs
+    #else
+      computeIcs();//diffusion cs
+    #endif
+  #endif
 
   const double F=96.5;
   const double R=8.314;
@@ -569,11 +571,11 @@ void CSubcell::pace(double v, double nai)
   double sumica=0;
   double sumir=0;
 
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+: sumica, sumir)
-#endif
-#pragma ivdep
-#pragma vector always
+  #ifdef _OPENMP
+  #pragma omp parallel for reduction(+: sumica, sumir)
+  #endif
+  #pragma ivdep
+  #pragma vector always
   for (int id=0;id<n;id++)
   {
     //L-double Ca current
@@ -718,7 +720,7 @@ void CSubcell::pace(double v, double nai)
     double Ica=gca*ica*NL;
 #endif
 
-    sumica+=Ica;
+    sumica+=Ica; //TODO Change ICa to include Soltis Saucerman PTMs
 
     //release current Ir
 #ifdef ___DETERMINISTIC
@@ -741,6 +743,7 @@ void CSubcell::pace(double v, double nai)
     double t2=Kmnao*Kmnao*Kmnao*(cp[id]*0.001)*(1+cp[id]/Kmcai);
     double t3=Kmcao*nai*nai*nai+nai*nai*nai*cao+nao*nao*nao*(cp[id]*0.001);
     double jnaca=NCXalpha*Ka*x3*(x1a-x1b*(cp[id]*0.001))/((t1+t2+t3)*x2)*vs/vp[id];
+    
     double newcp=(cs[crupos[id]]+taup*(kr*cjsr[id]-Ica+jnaca))/(1+taup*Jmaxx[id]*Po/vp[id]);
 #else
     double newcp=(cs[crupos[id]]+taup*(kr*cjsr[id]-Ica))/(1+taup*Jmaxx[id]*Po/vp[id]);
