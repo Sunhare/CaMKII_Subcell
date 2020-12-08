@@ -1,6 +1,6 @@
 DEF= -DCPU -D___PERIODIC -D___SIGMOID -D___NCX
 
-CXX=g++-9
+CXX=g++
 CXXFLAGS=-O3 -fopenmp
 
 

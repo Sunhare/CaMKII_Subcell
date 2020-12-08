@@ -1108,7 +1108,6 @@ void CSubcell::pace(double v, double nai)
   }
 
   icaave=sumica/n;
-  std::cout << "icaave" << std::endl;
   irave=sumir/n;
   incxave=sumjnaca/nn;
   iupave=sumjup/nn;
@@ -2395,7 +2394,7 @@ void CSubcell::voltage_clamp(double t, double peak_v, bool output, double dt, do
   if(output){
     // char* fname_voltage_clamp;
     // sprintf(fname_voltage_clamp, "0d_results_vc_%02.0f.txt", peak_v);
-    std::string fname_voltage_clamp = "0d_results_vc_20.txt";
+    std::string fname_voltage_clamp = "results/0d_results_vc_20.txt";
     printsc0d(t, v, fname_voltage_clamp);
   }
   // std::cout << "After output" <<  std::endl;

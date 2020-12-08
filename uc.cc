@@ -112,13 +112,13 @@ int main(int argc, char* argv[]) {
   //get steady state
   int Tn = 10 * pcl / dt;//total simulation time
   int ttn = 1;//global time counter
-  // std::cout << "Getting steady state.. " << std::endl;
-  // for (int tn = 0; tn < Tn; tn++) {
-  //   sc.pace(-80, 5.0);
-  //   if (tn % 20000 == 0) {
-  //     cout << setprecision(10) << tn * dt / pcl << "\t" << rec.computeavecnsr() << endl;
-  //   }
-  // }
+  std::cout << "Getting steady state.. " << std::endl;
+  for (int tn = 0; tn < Tn; tn++) {
+    sc.pace(-80, 5.0);
+    if (tn % 20000 == 0) {
+      cout << setprecision(10) << tn * dt / pcl << "\t" << rec.computeavecnsr() << endl;
+    }
+  }
 
 
 
@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
     prevavecp[i] = 0;
   }
 
-  int num_sims = 1;
+  int num_sims = 10;
   for (int itr = 0; itr < num_sims; itr++) {
     cout << itr << endl;
 
@@ -160,11 +160,11 @@ int main(int argc, char* argv[]) {
       // sc.voltage_clamp(t, 20, true);
       // std::cout << "After VC" << std::endl;
 
-    // sc.pace(v, 12.0);
-      // if (tn % 20==0){
-      //   sc.printsc0d(tn*dt,v,"0d_results.txt");
+      // sc.pace(v, 12.0);
+        // if (tn % 20==0){
+        //   sc.printsc0d(tn*dt,v,"0d_results.txt");
 
-    // }
+      // }
       
       if (tn % 20000 == 0) {
         cout << setprecision(10) << ttn * dt / pcl << "\t" << rec.computeavecnsr() << endl;
@@ -174,10 +174,6 @@ int main(int argc, char* argv[]) {
         avecs[i] += sc.cs[i];
         avecp[i] += sc.cp[i];
       }
-
-
-
-      
     }
     //end main loop
 
@@ -187,7 +183,7 @@ int main(int argc, char* argv[]) {
     }
 
     //record average values
-    ofstream osave("ave.txt");
+    ofstream osave("results/ave.txt");
     for (int i = 0; i < nn; i++) {
       prevaveci[i] = prevaveci[i] * itr + aveci[i] / Tn;
       prevaveci[i] /= (itr + 1);
