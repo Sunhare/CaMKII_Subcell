@@ -24,10 +24,10 @@ CSubcell::CSubcell(int sizex, int sizey, int sizez, int fmesh, double xii)
 {
   if (fmesh == 1)
     dt=0.1;
-  else if (fmesh == 5)
-    dt=0.005;
   else if (fmesh == 3)
     dt=0.01;
+  else if (fmesh == 5)
+    dt=0.005;
   else{
     cerr <<"fine mesh incorrect !\n";
     exit(1);
@@ -156,6 +156,9 @@ void CSubcell::init(double initci, double initcj)
   cnsr=new double [nn];
   cati=new double [nn];
   //  cats=new double [nn];
+
+  //TODO Create arrays for Soltis-Saucerman/Negroni model
+  // RyR_CKp = new double[nn]; 
 
   #ifdef ___DETERMINISTIC
     c1=new double [n];
@@ -787,7 +790,7 @@ void CSubcell::pace(double v, double nai)
 
 #ifdef ___KOSRCA
     double kCaSR = MaxSR - (MaxSR-MinSR)/(1+pow((ec50SR/cjsr[id]),hkosrca));
-    double koSRCa = 1/kCaSR;
+    double koSRCa = 10/kCaSR;
 #else
     const double koSRCa=1;
 #endif
@@ -796,11 +799,21 @@ void CSubcell::pace(double v, double nai)
     double k43=koSRCa*Kb*sgmd+pedk43;
 #endif
 
-#ifdef ___PTM
-    if (cp[id]>1.0) {
-      k12=k12*2;
-      k43=k43*2;
-    }
+#ifdef ___PTM // TODO: Change PTMs
+
+    // //D. Sato Quick Demo
+    // if (cp[id]>1.0) {
+    //   k12=k12*2;
+    //   k43=k43*2;
+    // }
+
+    //Soltis Saucerman PTM 
+    //0 < RyR_CKP < 1
+    //0 < RYR_PKAp < 1
+    double fCKII_RyR = (20 * RyR_CKp / 3.0 - 1 / 3.0); //≈ 1.0005, Max = 19/3, 6
+    double fPKA_RyR = RyR_PKAp * 1.025 + 0.9750; //1.025*0.025 + 0.9750= 1.00065, Max = 2
+    k12 *= (fCKII_RyR + fPKA_RyR - 1); //*= 1.0005, Max 7
+    k43 *= (fCKII_RyR + fPKA_RyR - 1); // Max 7
 
 #endif
 
@@ -836,6 +849,7 @@ void CSubcell::pace(double v, double nai)
     ryr1[id]=ryr1[id]-(ryr12+ryr14)+(ryr21+ryr41);
     ryr2[id]=ryr2[id]-(ryr21+ryr23)+(ryr12+ryr32);
     ryr3[id]=ryr3[id]-(ryr34+ryr32)+(ryr43+ryr23);
+
     if (ryr1[id]<0 ||ryr2[id]<0||ryr3[id]<0||ryr1[id]+ryr2[id]+ryr3[id]>nryr[id])
     {
       //          cout<<"RyR is negative "<<ryr1[id]<<"\t"<<ryr2[id]<<"\t"<<ryr3[id]<<endl;
@@ -898,6 +912,7 @@ void CSubcell::pace(double v, double nai)
         }
       }
     }
+
 #endif
 
     //update
@@ -1081,9 +1096,14 @@ void CSubcell::pace(double v, double nai)
 #endif
     double dcnsr=((Iup-Ileak)*(vi/vnsr)-Itr[id]*(vjsr/vnsr)+Icnsr[id]);
 
+#ifdef ____CONTRACTION //TODO implement Negroni 
+#endif 
+//Signaling network (ODEs go here, before dci) TODO
+    // dRYR_CKp = ci[id]*
 
+    RyR_CKp[id] += dRYR_CKp*dt;
 
-    ci[id]+=dci*dt;
+    ci[id]+=dci*dt; // Update the  
     cati[id]+=ITCi*dt;
 #ifdef ___NO_CS_BUFFER
     cs[id]=newcs;
@@ -1114,6 +1134,9 @@ void CSubcell::pace(double v, double nai)
   ileakave=sumjleak/nn;
   icabkave=sumjcabk/nn;
   islcapave=sumjslcap/nn;
+
+
+
 }
 int CSubcell::bino(double num, double p, int ii)
 {
