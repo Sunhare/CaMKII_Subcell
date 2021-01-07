@@ -946,7 +946,7 @@ void CSubcell::pace(double v, double nai)
     double MMg=BMMg*KMMg/((cp[id]+KMMg)*(cp[id]+KMMg));
     double SLH=BSLH*KSLH/((cp[id]+KSLH)*(cp[id]+KSLH)); // only for cs
     double Betap=1/(1+CAM+SR+MCa+MMg+SLH);
-
+ 
 
 #ifdef ___DEBUG
     if(isnan(Idps[crupos[id]])) //(Idsi != Idsi)
@@ -1101,7 +1101,7 @@ void CSubcell::pace(double v, double nai)
 //Signaling network (ODEs go here, before dci) TODO
     // dRYR_CKp = ci[id]*
 
-    RyR_CKp[id] += dRYR_CKp*dt;
+    // RyR_CKp[id] += dRYR_CKp*dt;
 
     ci[id]+=dci*dt; // Update the  
     cati[id]+=ITCi*dt;
