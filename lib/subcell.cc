@@ -81,7 +81,7 @@ CSubcell::CSubcell(int sizex, int sizey, int sizez, int fmesh, double xii)
   KNSR=1700;
 
   gca=1.0;
-  NoCaL=4;
+  NoCaL=4; //# of LCC per CRU 
 
   gleak=1.035*0.00001;
 
@@ -159,6 +159,21 @@ void CSubcell::init(double initci, double initcj)
 
   //TODO Create arrays for Soltis-Saucerman/Negroni model
   // RyR_CKp = new double[nn]; 
+
+  #ifdef ___PTM //Soltis-Saucerman/Negroni TODO
+    // CaMKII phosphorylated targets (%)
+    // LCC_CKp =new double [n];
+    // PLB_CKp =new double [n];
+
+    // PKA phosphorylated targets (%)
+    // LCCa_PKAp =new double [n];
+    // LCCb_PKAp =new double [n];
+    RyR_PKAp =new double [n];
+    // PLB_PKAn =new double [n]; //non-phosphorylated PLB targets
+    // TnI_PKAp =new double [n];
+    // PLM_PKAp =new double [n];
+    // Myo_PKAp =new double [n];
+  #endif 
 
   #ifdef ___DETERMINISTIC
     c1=new double [n];
@@ -593,10 +608,8 @@ void CSubcell::pace(double v, double nai)
     const double cat=0.5;
     double fca=1.0/(1.0+pow(double(cat/cp[id]),3));
 
-    //      double s1=0.0182688*fca;
     double s1=0.02*fca;//Juan code param
     const double s1t=0.00195;
-    //      double xk1=0.024168*fca;
     double xk1=0.03*fca;//Juan code param
     const double xk2=1.03615e-4;
 
@@ -605,8 +618,6 @@ void CSubcell::pace(double v, double nai)
     double s2=s1*(r1/r2)*(xk2/xk1);
     const double s2t=s1t*(r1/r2)*(xk2t/xk1t);
 
-
-    //      const double tca=78.0329;
     const double tca=114;//Juan code param
     const double cpt=1.5;
     double tau_ca=tca/(1.0+pow((cp[id]/cpt),4))+1;
@@ -645,7 +656,7 @@ void CSubcell::pace(double v, double nai)
     int NL=0;
 #pragma ivdep
 #pragma vector always
-    for (int j=0;j<NoCaL;j++)
+    for (int j=0;j<NoCaL;j++) //Mahajan Model L-type Ca current (LCC)
     {
       //          I - I
       //          |   |  |
@@ -721,6 +732,14 @@ void CSubcell::pace(double v, double nai)
       }
     }
     double Ica=gca*ica*NL;
+    // if(id == 1 || id == 125 || id == 600){
+      // if(Ica == 0){ //ICa debugging
+      //   printf("Error: Ica == 0, gca=%.f, ica=%.f, NL=%d\n", gca, ica,NL);
+      //   // double ica=(factor/(exp(za)-1.0))*(cp[id]*0.001*exp(za)-cao);
+      //   printf("cp[id]: %.f, cao: %.f \n", cp[id], cao);
+      //   printf("id:%d\n", id);
+      // }
+    // }
 #endif
 
     sumica+=Ica; //TODO Change ICa to include Soltis Saucerman PTMs
@@ -799,6 +818,10 @@ void CSubcell::pace(double v, double nai)
     double k43=koSRCa*Kb*sgmd+pedk43;
 #endif
 
+
+  //TODO Insert Negroni et al 2015
+
+
 #ifdef ___PTM // TODO: Change PTMs
 
     // //D. Sato Quick Demo
@@ -812,7 +835,10 @@ void CSubcell::pace(double v, double nai)
     //0 < RYR_PKAp < 1
     double fCKII_RyR = (20 * RyR_CKp / 3.0 - 1 / 3.0); //≈ 1.0005, Max = 19/3, 6
     double fPKA_RyR = RyR_PKAp * 1.025 + 0.9750; //1.025*0.025 + 0.9750= 1.00065, Max = 2
-    k12 *= (fCKII_RyR + fPKA_RyR - 1); //*= 1.0005, Max 7
+    k12 *= (fCKII_RyR + fPKA_RyR - 1); //*= 1.0005, Max 7, Record this number and check the multiplier (or k12)
+    //Check with and without ptm 
+    //if k12 becomes reasonably large
+    //find distribution first, if I can't then check k12
     k43 *= (fCKII_RyR + fPKA_RyR - 1); // Max 7
 
 #endif
@@ -924,10 +950,10 @@ void CSubcell::pace(double v, double nai)
     //      cscp1[crupos[id]]=cp[id]*vp[id]/vs/taup;
     //      cscp2[crupos[id]]=1/taup*vp[id]/vs;
 #else
-    Idps[crupos[id]]=(cp[id]-cs[crupos[id]])/taup;
+    Idps[crupos[id]]=(cp[id]-cs[crupos[id]])/taup; //Restrepo diffusion
 #endif
 
-#ifdef ___CPDIFF
+#ifdef ___CONTRACTIONPDIFF
     //Instantaneous buffering functions
     const double KCAM=7.0;
     const double BCAM=24.0;
@@ -948,20 +974,20 @@ void CSubcell::pace(double v, double nai)
     double Betap=1/(1+CAM+SR+MCa+MMg+SLH);
  
 
-#ifdef ___DEBUG
-    if(isnan(Idps[crupos[id]])) //(Idsi != Idsi)
-    {
-      cout<<setprecision(10)<<id<<"\t"<<Idps[crupos[id]]<<"\t cp="<<cp[id]<<"\t cs="<<cs[crupos[id]]<<endl;
-      bSTOP = true;
-    }
-#endif
+    #ifdef ___DEBUG
+        if(isnan(Idps[crupos[id]])) //(Idsi != Idsi)
+        {
+          cout<<setprecision(10)<<id<<"\t"<<Idps[crupos[id]]<<"\t cp="<<cp[id]<<"\t cs="<<cs[crupos[id]]<<endl;
+          bSTOP = true;
+        }
+    #endif
 
-#ifdef ___NCX
-    double dcp=Betap*(Ir-Ica+jnaca-Idps[crupos[id]]);
-#else
-    double dcp=Betap*(Ir-Ica-Idps[crupos[id]]);
-#endif
-    cp[id]+=dcp*dt;
+    #ifdef ___NCX
+        double dcp=Betap*(Ir-Ica+jnaca-Idps[crupos[id]]);
+    #else
+        double dcp=Betap*(Ir-Ica-Idps[crupos[id]]);
+    #endif
+      cp[id]+=dcp*dt;
 #else
     cp[id]=newcp;
 #endif
@@ -1096,8 +1122,8 @@ void CSubcell::pace(double v, double nai)
 #endif
     double dcnsr=((Iup-Ileak)*(vi/vnsr)-Itr[id]*(vjsr/vnsr)+Icnsr[id]);
 
-#ifdef ____CONTRACTION //TODO implement Negroni 
-#endif 
+// #ifdef ___CONTRACTION //TODO implement Negroni 
+// #endif 
 //Signaling network (ODEs go here, before dci) TODO
     // dRYR_CKp = ci[id]*
 
@@ -1144,7 +1170,7 @@ int CSubcell::bino(double num, double p, int ii)
   double lambda=num*p;
   if (lambda>12)
   {
-    //Gaussian
+    //Gaussian, Restreppo paper
     double x1,x2,w;
     do
     {
@@ -1158,7 +1184,7 @@ int CSubcell::bino(double num, double p, int ii)
     res=y1*sqrt(num*p*(1-p))+num*p;// *** ave=num*p , rho^2=num*p*(1-p)
     res=int(res+0.5);//round
   }
-  else    if (100*p<6.6+52*pow(num,double(-0.5)))
+  else if (100*p<6.6+52*pow(num,double(-0.5)))
   {
     //Poisson
     double L=exp(-lambda);
