@@ -163,7 +163,6 @@ void CSubcell::init(double initci, double initcj)
   #ifdef ___PTM //Soltis-Saucerman/Negroni TODO
     // CaMKII phosphorylated targets (%)
     // LCC_CKp =new double [n];
-    RyR_CKp =new double [n];
     // PLB_CKp =new double [n];
 
     // PKA phosphorylated targets (%)
