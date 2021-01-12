@@ -3,9 +3,7 @@
 // standard parameter is Ca leak param; if you don't want ___USE_ORG_PARAM
 // no TC in Cs
 // Cs has buffer if you don't want, use ___NO_CS_BUFFER
-// fine mesh is o
-
-ional// to use fmesh = 3 or 5 ; for 5 dt=0.005
+// fine mesh is optional// to use fmesh = 3 or 5 ; for 5 dt=0.005
 
 
 //compile Options
@@ -148,10 +146,6 @@ public:
   //  double *ci,*cs,*cp,*cjsr,*cnsr,*cati,*cats;
   double *ci,*cs,*cp,*cjsr,*cnsr,*cati;
   double *cscp1,*cscp2,*Itr;
-
-#ifdef ___PTM
-  double *LCC_CKp, *RyR_CKp, *PLB_CKp, *LCCa_PKAp, *LCCb_PKAp, *RyR_PKAp
-#endif 
 #ifdef ___DETERMINISTIC
   double *c1, *c2, *i1ca, *i1ba, *i2ca, *i2ba, *fryr1, *fryr2, *fryr3;
 #else
@@ -174,6 +168,7 @@ public:
 
   //Bardia 2020
   void printsc0d(double t, double v,std::string filename);
+  // void voltage_clamp(double relative_t, double peak_v, bool output, double dt, double min_v, double APD, double pcl, double na_conc);
   void voltage_clamp(double t, double peak_v, bool output, double dt=0.1, double min_v = -80.0, double APD = 250.0, double pcl=1000.0, double na_conc=12.0);
 
 

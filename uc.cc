@@ -46,9 +46,9 @@ int main(int argc, char* argv[]) {
 
 
   //parameter setting
-  // sc.setgleak(0);
+  sc.setgleak(0);
   sc.setvup(sc.getvup() * 1);
-  // sc.setgca(0.0);
+  sc.setgca(0.0);
   sc.settautr(sc.gettautr() * 10);
 
   sc.NCXalpha = 0.11;
@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
 
 
   //get steady state
-  int Tn = 10 * pcl / dt;//total simulation time (10 beats)
+  int Tn = 10 * pcl / dt;//total simulation time
   int ttn = 1;//global time counter
   std::cout << "Getting steady state.. " << std::endl;
   for (int tn = 0; tn < Tn; tn++) {
@@ -155,8 +155,16 @@ int main(int argc, char* argv[]) {
 
       double t_relative = (tn%(int(pcl/dt)))*dt;
 
-      // sc.pace(-80, 12.0); //Fixed [Na]
-      sc.voltage_clamp(t, 20, true);
+      sc.pace(-80, 12.0);
+      // std::cout << "Before VC" << std::endl;
+      // sc.voltage_clamp(t, 20, true);
+      // std::cout << "After VC" << std::endl;
+
+      // sc.pace(v, 12.0);
+        // if (tn % 20==0){
+        //   sc.printsc0d(tn*dt,v,"0d_results.txt");
+
+      // }
       
       if (tn % 20000 == 0) {
         cout << setprecision(10) << ttn * dt / pcl << "\t" << rec.computeavecnsr() << endl;
