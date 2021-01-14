@@ -46,9 +46,9 @@ int main(int argc, char* argv[]) {
 
 
   //parameter setting
-  sc.setgleak(0);
+  // sc.setgleak(0);
   sc.setvup(sc.getvup() * 1);
-  sc.setgca(0.0);
+  // sc.setgca(0.0);
   sc.settautr(sc.gettautr() * 10);
 
   sc.NCXalpha = 0.11;
@@ -156,9 +156,7 @@ int main(int argc, char* argv[]) {
       double t_relative = (tn%(int(pcl/dt)))*dt;
 
       sc.pace(-80, 12.0);
-      // std::cout << "Before VC" << std::endl;
       // sc.voltage_clamp(t, 20, true);
-      // std::cout << "After VC" << std::endl;
 
       // sc.pace(v, 12.0);
         // if (tn % 20==0){

@@ -158,7 +158,10 @@ void CSubcell::init(double initci, double initcj)
   //  cats=new double [nn];
 
   //TODO Create arrays for Soltis-Saucerman/Negroni model
-  // RyR_CKp = new double[nn]; 
+
+  #ifdef ___PTM
+    allocate_memory_PTM_CaM_vars(n);
+  #endif 
 
   #ifdef ___DETERMINISTIC
     c1=new double [n];
@@ -238,6 +241,10 @@ void CSubcell::init(double initci, double initcj)
       Ics[id]=0;
       Idps[id]=0;
   #endif
+
+  #ifdef ___PTM
+    init_parameters_PTM_CaM(id);
+  #endif 
 
       Ici[id]=0;
 
@@ -645,7 +652,7 @@ void CSubcell::pace(double v, double nai)
     int NL=0;
 #pragma ivdep
 #pragma vector always
-    for (int j=0;j<NoCaL;j++)
+    for (int j=0;j<NoCaL;j++) //Mahajan model
     {
       //          I - I
       //          |   |  |
@@ -956,6 +963,59 @@ void CSubcell::pace(double v, double nai)
     }
 #endif
 
+
+#ifdef ___CONTRACTION //TODO implement Negroni 
+#endif 
+
+  //Main PTM ODEs
+#ifdef ___PTM
+
+    //CaM Dyad
+    double* dydt_CaMDyad;
+    dydt_CaMDyad = calc_dydt_CaM_ODEs(id, dydt_CaMDyad,
+      //CaM Dyad/Cleft State Variables
+      Ca2CaM_dyad[id],Ca4CaM_dyad[id],CaMB_dyad[id],Ca2CaMB_dyad[id],Ca4CaMB_dyad[id],
+      Pb2_dyad[id],Pb_dyad[id],Pt_dyad[id],Pt2_dyad[id],Pa_dyad[id],
+      CaMCaN_dyad[id],Ca2CaMCaN_dyad[id],Ca4CaMCaN_dyad[id], CaM_dyad[id],
+      Ca4CaN_dyad[id], CaMCa4CaN_dyad[id],Ca2CaMCa4CaN_dyad[id],Ca4CaMCa4CaN_dyad[id],
+
+
+      //CaM Dyad/Cleft Parameters
+      CaMtotDyad[id],BtotDyad[id],CaMKIItotDyad[id],CaNtotDyad[id],PP1totDyad[id],cp[id], 2);
+
+    //CaM SL
+    double* dydt_CaMSL;
+    dydt_CaMSL = calc_dydt_CaM_ODEs(id, dydt_CaMSL,
+      //CaM Sarcolemmal State Variables
+      Ca2CaM_sl[id],Ca4CaM_sl[id],CaMB_sl[id],Ca2CaMB_sl[id],Ca4CaMB_sl[id],
+      Pb2_sl[id],Pb_sl[id],Pt_sl[id],Pt2_sl[id],Pa_sl[id],
+      CaMCaN_sl[id],Ca2CaMCaN_sl[id],Ca4CaMCaN_sl[id], CaM_sl[id],
+      Ca4CaN_sl[id], CaMCa4CaN_sl[id],Ca2CaMCa4CaN_sl[id],Ca4CaMCa4CaN_sl[id],
+
+
+      //CaM Sarcolemmal Parameters
+      CaMtotSL[id],BtotSL[id],CaMKIItotSL[id],CaNtotSL[id],PP1totSL[id],cs[id], 1);
+
+    //CaM Cytosol
+    double* dydt_CaMCyt;
+    dydt_CaMCyt = calc_dydt_CaM_ODEs(id, dydt_CaMCyt,
+      //CaM Cytosol State Variables
+      Ca2CaM_cyt[id],Ca4CaM_cyt[id],CaMB_cyt[id],Ca2CaMB_cyt[id],Ca4CaMB_cyt[id],
+      Pb2_cyt[id],Pb_cyt[id],Pt_cyt[id],Pt2_cyt[id],Pa_cyt[id],
+      CaMCaN_cyt[id],Ca2CaMCaN_cyt[id],Ca4CaMCaN_cyt[id], CaM_cyt[id],
+      Ca4CaN_cyt[id], CaMCa4CaN_cyt[id],Ca2CaMCa4CaN_cyt[id],Ca4CaMCa4CaN_cyt[id],
+
+
+      //CaM Cytosol Parameters
+      CaMtotCyt[id],BtotCyt[id],CaMKIItotCyt[id],CaNtotCyt[id],PP1totCyt[id],ci[id], 0);
+
+    solve_ODE_CaM(id, dt, dydt_CaMDyad, 2);
+    solve_ODE_CaM(id, dt, dydt_CaMSL, 1);
+    solve_ODE_CaM(id, dt, dydt_CaMCyt, 0);
+
+
+#endif
+
 #ifdef ___NCX
     double dcp=Betap*(Ir-Ica+jnaca-Idps[crupos[id]]);
 #else
@@ -1096,11 +1156,8 @@ void CSubcell::pace(double v, double nai)
 #endif
     double dcnsr=((Iup-Ileak)*(vi/vnsr)-Itr[id]*(vjsr/vnsr)+Icnsr[id]);
 
-#ifdef ____CONTRACTION //TODO implement Negroni 
-#endif 
 //Signaling network (ODEs go here, before dci) TODO
     // dRYR_CKp = ci[id]*
-
     // RyR_CKp[id] += dRYR_CKp*dt;
 
     ci[id]+=dci*dt; // Update the  
@@ -1236,10 +1293,9 @@ double CSubcell::computeavecnsr(void)
   return (sum/nn);
 }
 
-void CSubcell::setboundary(int bcc)
-{
-  if (bc>0)//corner
-  {
+void CSubcell::setboundary(int bcc){
+  if (bc>0){//corner
+
     Jmaxx[0+0*nx+0*nxny]=0;
     Jmaxx[0+(ny-1)*nx+(nz-1)*nxny]=0;
     Jmaxx[0+(ny-1)*nx+0*nxny]=0;
@@ -1249,12 +1305,11 @@ void CSubcell::setboundary(int bcc)
     Jmaxx[(nx-1)+0*nx+0*nxny]=0;
     Jmaxx[(nx-1)+(ny-1)*nx+(nz-1)*nxny]=0;
   }
-  if (bc>1)//edge
-  {
+  if (bc>1){//edge
     //x fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
     for (int j=1;j<ny-1;j++)
     {
       Jmaxx[0+j*nx+0*nxny]=0;
@@ -1263,9 +1318,9 @@ void CSubcell::setboundary(int bcc)
       Jmaxx[(nx-1)+j*nx+(nz-1)*nxny]=0;
     }
     //y fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
     for (int i=1;i<(nx-1);i++)
     {
       Jmaxx[i+0*nx+0*nxny]=0;
@@ -1273,8 +1328,8 @@ void CSubcell::setboundary(int bcc)
       Jmaxx[i+0*nx+(nz-1)*nxny]=0;
       Jmaxx[i+(ny-1)*nx+(nz-1)*nxny]=0;
     }
-#pragma ivdep
-#pragma vector always
+  #pragma ivdep
+  #pragma vector always
     for (int k=1;k<nz-1;k++)
     {
       Jmaxx[0+0*nx+k*nxny]=0;
@@ -1286,13 +1341,13 @@ void CSubcell::setboundary(int bcc)
   if (bc>2)//surface
   {
     //x fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
     for (int j=1;j<ny-1;j++)
     {
-#pragma ivdep
-#pragma vector always
+  #pragma ivdep
+  #pragma vector always
       for (int k=1;k<nz-1;k++)
       {
         Jmaxx[0+j*nx+k*nxny]=0;
@@ -1300,21 +1355,21 @@ void CSubcell::setboundary(int bcc)
       }
     }
     //y fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
     for (int i=1;i<(nx-1);i++)
     {
-#pragma ivdep
-#pragma vector always
+  #pragma ivdep
+  #pragma vector always
       for (int k=1;k<nz-1;k++)
       {
         Jmaxx[i+0*nx+k*nxny]=0;
         Jmaxx[i+(ny-1)*nx+k*nxny]=0;
       }
       //z fixed
-#pragma ivdep
-#pragma vector always
+  #pragma ivdep
+  #pragma vector always
       for (int j=1;j<ny-1;j++)
       {
         Jmaxx[i+j*nx+0*nxny]=0;
@@ -1333,9 +1388,8 @@ void CSubcell::setboundary(int bcc)
     Jmaxx[(nx-2)+1*nx+1*nxny]=0;
     Jmaxx[(nx-2)+(ny-2)*nx+(nz-2)*nxny]=0;
   }
-
-
 }
+
 void CSubcell::setJmax(double newJmax){
   Jmax=newJmax;
   for(int id=0;id<n;id++)Jmaxx[id]=Jmax;
@@ -1349,1033 +1403,1033 @@ void CSubcell::resetBuffer(void){
   const double konEGTA=4E-3;
   const double koffEGTA=2E-3;
 
-#pragma ivdep
-#pragma vector always
-  for (int id=0;id<nn;id++)
-  {
-    cati[id]=kon*ci[id]*BT/(kon*ci[id]+koff);
-    //      cats[id]=kon*cs[id]*BT/(kon*cs[id]+koff);
-#ifdef ___EGTA
-    caEGTAi[id]=konEGTA*ci[id]*BEGTA/(konEGTA*ci[id]+koffEGTA);
-    caEGTAs[id]=konEGTA*cs[id]*BEGTA/(konEGTA*cs[id]+koffEGTA);
-#endif
+  #pragma ivdep
+  #pragma vector always
+    for (int id=0;id<nn;id++)
+    {
+      cati[id]=kon*ci[id]*BT/(kon*ci[id]+koff);
+      //      cats[id]=kon*cs[id]*BT/(kon*cs[id]+koff);
+  #ifdef ___EGTA
+      caEGTAi[id]=konEGTA*ci[id]*BEGTA/(konEGTA*ci[id]+koffEGTA);
+      caEGTAs[id]=konEGTA*cs[id]*BEGTA/(konEGTA*cs[id]+koffEGTA);
+  #endif
   }
 }
 
 void CSubcell::computeIci(void)
 {
 
-#ifdef ___PERIODIC
-  Ici[0+0*nnx+0*nnxnny]=(ci[0+0*nnx+0*nnxnny+1]+ci[(nnx-1)+0*nnx+0*nnxnny]-2*ci[0+0*nnx+0*nnxnny])/tauiL+
-    (ci[0+(0+1)*nnx+0*nnxnny]+ci[0+(nny-1)*nnx+0*nnxnny]-2*ci[0+0*nnx+0*nnxnny])/tauiT+
-    (ci[0+0*nnx+(0+1)*nnxnny]+ci[0+0*nnx+(nnz-1)*nnxnny]-2*ci[0+0*nnx+0*nnxnny])/tauiT;
-  Ici[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
-    (ci[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[0+(0)*nnx+(nnz-1)*nnxnny]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
-    (ci[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[0+(nny-1)*nnx+(0)*nnxnny]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
-  Ici[0+(nny-1)*nnx+0*nnxnny]=(ci[0+(nny-1)*nnx+0*nnxnny+1]+ci[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiL+
-    (ci[0+((nny-1)-1)*nnx+0*nnxnny]+ci[0+(0)*nnx+0*nnxnny]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiT+
-    (ci[0+(nny-1)*nnx+(0+1)*nnxnny]+ci[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiT;
-  Ici[0+0*nnx+(nnz-1)*nnxnny]=(ci[0+0*nnx+(nnz-1)*nnxnny+1]+ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiL+
-    (ci[0+(0+1)*nnx+(nnz-1)*nnxnny]+ci[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiT+
-    (ci[0+0*nnx+((nnz-1)-1)*nnxnny]+ci[0+0*nnx+(0)*nnxnny]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiT;
-  Ici[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+ci[(0)+(nny-1)*nnx+0*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiL+
-    (ci[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+ci[(nnx-1)+(0)*nnx+0*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiT+
-    (ci[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiT;
-  Ici[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+ci[(0)+0*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiL+
-    (ci[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiT+
-    (ci[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+0*nnx+(0)*nnxnny]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiT;
-  Ici[(nnx-1)+0*nnx+0*nnxnny]=(ci[(nnx-1)+0*nnx+0*nnxnny-1]+ci[(0)+0*nnx+0*nnxnny]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiL+
-    (ci[(nnx-1)+(0+1)*nnx+0*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiT+
-    (ci[(nnx-1)+0*nnx+(0+1)*nnxnny]+ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiT;
-  Ici[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+ci[(0)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
-    (ci[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+(0)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
-    (ci[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(0)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
-  //x fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int j=1;j<nny-1;j++)
-  {
-    Ici[0+j*nnx+0*nnxnny]=(ci[0+j*nnx+0*nnxnny+1]+ci[(nnx-1)+j*nnx+0*nnxnny]-2*ci[0+j*nnx+0*nnxnny])/tauiL+
-      (ci[0+(j+1)*nnx+0*nnxnny]+ci[0+(j-1)*nnx+0*nnxnny]-2*ci[0+j*nnx+0*nnxnny])/tauiT+
-      (ci[0+j*nnx+(0+1)*nnxnny]+ci[0+j*nnx+(nnz-1)*nnxnny]-2*ci[0+j*nnx+0*nnxnny])/tauiT;
-    Ici[(nnx-1)+j*nnx+0*nnxnny]=(ci[(nnx-1)+j*nnx+0*nnxnny-1]+ci[(0)+j*nnx+0*nnxnny]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiL+
-      (ci[(nnx-1)+(j+1)*nnx+0*nnxnny]+ci[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiT+
-      (ci[(nnx-1)+j*nnx+(0+1)*nnxnny]+ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiT;
-    Ici[0+j*nnx+(nnz-1)*nnxnny]=(ci[0+j*nnx+(nnz-1)*nnxnny+1]+ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiL+
-      (ci[0+(j+1)*nnx+(nnz-1)*nnxnny]+ci[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiT+
-      (ci[0+j*nnx+((nnz-1)-1)*nnxnny]+ci[0+j*nnx+(0)*nnxnny]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiT;
-    Ici[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+ci[(0)+j*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiL+
-      (ci[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiT+
-      (ci[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+j*nnx+(0)*nnxnny]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Ici[0+j*nnx+k*nnxnny]=(ci[0+j*nnx+k*nnxnny+1]+ci[(nnx-1)+j*nnx+k*nnxnny]-2*ci[0+j*nnx+k*nnxnny])/tauiL+
-        (ci[0+(j+1)*nnx+k*nnxnny]+ci[0+(j-1)*nnx+k*nnxnny]-2*ci[0+j*nnx+k*nnxnny])/tauiT+
-        (ci[0+j*nnx+(k+1)*nnxnny]+ci[0+j*nnx+(k-1)*nnxnny]-2*ci[0+j*nnx+k*nnxnny])/tauiT;
-      Ici[(nnx-1)+j*nnx+k*nnxnny]=(ci[(nnx-1)+j*nnx+k*nnxnny-1]+ci[(0)+j*nnx+k*nnxnny]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiL+
-        (ci[(nnx-1)+(j+1)*nnx+k*nnxnny]+ci[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiT+
-        (ci[(nnx-1)+j*nnx+(k+1)*nnxnny]+ci[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiT;
-    }
-  }
-  //y fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int i=1;i<(nnx-1);i++)
-  {
-    Ici[i+0*nnx+0*nnxnny]=(ci[i+0*nnx+0*nnxnny+1]+ci[i+0*nnx+0*nnxnny-1]-2*ci[i+0*nnx+0*nnxnny])/tauiL+
-      (ci[i+(0+1)*nnx+0*nnxnny]+ci[i+(nny-1)*nnx+0*nnxnny]-2*ci[i+0*nnx+0*nnxnny])/tauiT+
-      (ci[i+0*nnx+(0+1)*nnxnny]+ci[i+0*nnx+(nnz-1)*nnxnny]-2*ci[i+0*nnx+0*nnxnny])/tauiT;
-    Ici[i+(nny-1)*nnx+0*nnxnny]=(ci[i+(nny-1)*nnx+0*nnxnny+1]+ci[i+(nny-1)*nnx+0*nnxnny-1]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiL+
-      (ci[i+((nny-1)-1)*nnx+0*nnxnny]+ci[i+(0)*nnx+0*nnxnny]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiT+
-      (ci[i+(nny-1)*nnx+(0+1)*nnxnny]+ci[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiT;
-    Ici[i+0*nnx+(nnz-1)*nnxnny]=(ci[i+0*nnx+(nnz-1)*nnxnny+1]+ci[i+0*nnx+(nnz-1)*nnxnny-1]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiL+
-      (ci[i+(0+1)*nnx+(nnz-1)*nnxnny]+ci[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiT+
-      (ci[i+0*nnx+((nnz-1)-1)*nnxnny]+ci[i+0*nnx+(0)*nnxnny]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiT;
-    Ici[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+ci[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
-      (ci[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[i+(0)*nnx+(nnz-1)*nnxnny]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
-      (ci[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[i+(nny-1)*nnx+(0)*nnxnny]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Ici[i+0*nnx+k*nnxnny]=(ci[i+0*nnx+k*nnxnny+1]+ci[i+0*nnx+k*nnxnny-1]-2*ci[i+0*nnx+k*nnxnny])/tauiL+
-        (ci[i+(0+1)*nnx+k*nnxnny]+ci[i+(nny-1)*nnx+k*nnxnny]-2*ci[i+0*nnx+k*nnxnny])/tauiT+
-        (ci[i+0*nnx+(k+1)*nnxnny]+ci[i+0*nnx+(k-1)*nnxnny]-2*ci[i+0*nnx+k*nnxnny])/tauiT;
-      Ici[i+(nny-1)*nnx+k*nnxnny]=(ci[i+(nny-1)*nnx+k*nnxnny+1]+ci[i+(nny-1)*nnx+k*nnxnny-1]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiL+
-        (ci[i+((nny-1)-1)*nnx+k*nnxnny]+ci[i+(0)*nnx+k*nnxnny]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiT+
-        (ci[i+(nny-1)*nnx+(k+1)*nnxnny]+ci[i+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiT;
-    }
-    //z fixed
-#pragma ivdep
-#pragma vector always
+  #ifdef ___PERIODIC
+    Ici[0+0*nnx+0*nnxnny]=(ci[0+0*nnx+0*nnxnny+1]+ci[(nnx-1)+0*nnx+0*nnxnny]-2*ci[0+0*nnx+0*nnxnny])/tauiL+
+      (ci[0+(0+1)*nnx+0*nnxnny]+ci[0+(nny-1)*nnx+0*nnxnny]-2*ci[0+0*nnx+0*nnxnny])/tauiT+
+      (ci[0+0*nnx+(0+1)*nnxnny]+ci[0+0*nnx+(nnz-1)*nnxnny]-2*ci[0+0*nnx+0*nnxnny])/tauiT;
+    Ici[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
+      (ci[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[0+(0)*nnx+(nnz-1)*nnxnny]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
+      (ci[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[0+(nny-1)*nnx+(0)*nnxnny]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
+    Ici[0+(nny-1)*nnx+0*nnxnny]=(ci[0+(nny-1)*nnx+0*nnxnny+1]+ci[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiL+
+      (ci[0+((nny-1)-1)*nnx+0*nnxnny]+ci[0+(0)*nnx+0*nnxnny]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiT+
+      (ci[0+(nny-1)*nnx+(0+1)*nnxnny]+ci[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiT;
+    Ici[0+0*nnx+(nnz-1)*nnxnny]=(ci[0+0*nnx+(nnz-1)*nnxnny+1]+ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiL+
+      (ci[0+(0+1)*nnx+(nnz-1)*nnxnny]+ci[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiT+
+      (ci[0+0*nnx+((nnz-1)-1)*nnxnny]+ci[0+0*nnx+(0)*nnxnny]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiT;
+    Ici[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+ci[(0)+(nny-1)*nnx+0*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiL+
+      (ci[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+ci[(nnx-1)+(0)*nnx+0*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiT+
+      (ci[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiT;
+    Ici[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+ci[(0)+0*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiL+
+      (ci[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiT+
+      (ci[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+0*nnx+(0)*nnxnny]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiT;
+    Ici[(nnx-1)+0*nnx+0*nnxnny]=(ci[(nnx-1)+0*nnx+0*nnxnny-1]+ci[(0)+0*nnx+0*nnxnny]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiL+
+      (ci[(nnx-1)+(0+1)*nnx+0*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiT+
+      (ci[(nnx-1)+0*nnx+(0+1)*nnxnny]+ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiT;
+    Ici[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+ci[(0)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
+      (ci[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+(0)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
+      (ci[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(0)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
+    //x fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
     for (int j=1;j<nny-1;j++)
     {
-      Ici[i+j*nnx+0*nnxnny]=(ci[i+j*nnx+0*nnxnny+1]+ci[i+j*nnx+0*nnxnny-1]-2*ci[i+j*nnx+0*nnxnny])/tauiL+
-        (ci[i+(j+1)*nnx+0*nnxnny]+ci[i+(j-1)*nnx+0*nnxnny]-2*ci[i+j*nnx+0*nnxnny])/tauiT+
-        (ci[i+j*nnx+(0+1)*nnxnny]+ci[i+j*nnx+(nnz-1)*nnxnny]-2*ci[i+j*nnx+0*nnxnny])/tauiT;
-      Ici[i+j*nnx+(nnz-1)*nnxnny]=(ci[i+j*nnx+(nnz-1)*nnxnny+1]+ci[i+j*nnx+(nnz-1)*nnxnny-1]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiL+
-        (ci[i+(j+1)*nnx+(nnz-1)*nnxnny]+ci[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiT+
-        (ci[i+j*nnx+((nnz-1)-1)*nnxnny]+ci[i+j*nnx+(0)*nnxnny]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiT;
-    }
-  }
-#pragma ivdep
-#pragma vector always
-  for (int k=1;k<nnz-1;k++)
-  {
-    Ici[0+0*nnx+k*nnxnny]=(ci[0+0*nnx+k*nnxnny+1]+ci[(nnx-1)+0*nnx+k*nnxnny]-2*ci[0+0*nnx+k*nnxnny])/tauiL+
-      (ci[0+(0+1)*nnx+k*nnxnny]+ci[0+(nny-1)*nnx+k*nnxnny]-2*ci[0+0*nnx+k*nnxnny])/tauiT+
-      (ci[0+0*nnx+(k+1)*nnxnny]+ci[0+0*nnx+(k-1)*nnxnny]-2*ci[0+0*nnx+k*nnxnny])/tauiT;
-    Ici[0+(nny-1)*nnx+k*nnxnny]=(ci[0+(nny-1)*nnx+k*nnxnny+1]+ci[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiL+
-      (ci[0+((nny-1)-1)*nnx+k*nnxnny]+ci[0+(0)*nnx+k*nnxnny]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiT+
-      (ci[0+(nny-1)*nnx+(k+1)*nnxnny]+ci[0+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiT;
-    Ici[(nnx-1)+0*nnx+k*nnxnny]=(ci[(nnx-1)+0*nnx+k*nnxnny-1]+ci[(0)+0*nnx+k*nnxnny]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiL+
-      (ci[(nnx-1)+(0+1)*nnx+k*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiT+
-      (ci[(nnx-1)+0*nnx+(k+1)*nnxnny]+ci[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiT;
-    Ici[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+ci[(0)+(nny-1)*nnx+k*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiL+
-      (ci[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+ci[(nnx-1)+(0)*nnx+k*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiT+
-      (ci[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiT;
-  }
-#else
-  Ici[0+0*nnx+0*nnxnny]=(ci[0+0*nnx+0*nnxnny+1]+ci[0+0*nnx+0*nnxnny+1]-2*ci[0+0*nnx+0*nnxnny])/tauiL+
-    (ci[0+(0+1)*nnx+0*nnxnny]+ci[0+(0+1)*nnx+0*nnxnny]-2*ci[0+0*nnx+0*nnxnny])/tauiT+
-    (ci[0+0*nnx+(0+1)*nnxnny]+ci[0+0*nnx+(0+1)*nnxnny]-2*ci[0+0*nnx+0*nnxnny])/tauiT;
-  Ici[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+ci[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
-    (ci[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
-    (ci[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
-  Ici[0+(nny-1)*nnx+0*nnxnny]=(ci[0+(nny-1)*nnx+0*nnxnny+1]+ci[0+(nny-1)*nnx+0*nnxnny+1]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiL+
-    (ci[0+((nny-1)-1)*nnx+0*nnxnny]+ci[0+((nny-1)-1)*nnx+0*nnxnny]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiT+
-    (ci[0+(nny-1)*nnx+(0+1)*nnxnny]+ci[0+(nny-1)*nnx+(0+1)*nnxnny]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiT;
-  Ici[0+0*nnx+(nnz-1)*nnxnny]=(ci[0+0*nnx+(nnz-1)*nnxnny+1]+ci[0+0*nnx+(nnz-1)*nnxnny+1]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiL+
-    (ci[0+(0+1)*nnx+(nnz-1)*nnxnny]+ci[0+(0+1)*nnx+(nnz-1)*nnxnny]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiT+
-    (ci[0+0*nnx+((nnz-1)-1)*nnxnny]+ci[0+0*nnx+((nnz-1)-1)*nnxnny]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiT;
-  Ici[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+ci[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiL+
-    (ci[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+ci[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiT+
-    (ci[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiT;
-  Ici[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiL+
-    (ci[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiT+
-    (ci[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiT;
-  Ici[(nnx-1)+0*nnx+0*nnxnny]=(ci[(nnx-1)+0*nnx+0*nnxnny-1]+ci[(nnx-1)+0*nnx+0*nnxnny-1]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiL+
-    (ci[(nnx-1)+(0+1)*nnx+0*nnxnny]+ci[(nnx-1)+(0+1)*nnx+0*nnxnny]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiT+
-    (ci[(nnx-1)+0*nnx+(0+1)*nnxnny]+ci[(nnx-1)+0*nnx+(0+1)*nnxnny]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiT;
-  Ici[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
-    (ci[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
-    (ci[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
-  //x fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int j=1;j<nny-1;j++)
-  {
-    Ici[0+j*nnx+0*nnxnny]=(ci[0+j*nnx+0*nnxnny+1]+ci[0+j*nnx+0*nnxnny+1]-2*ci[0+j*nnx+0*nnxnny])/tauiL+
-      (ci[0+(j+1)*nnx+0*nnxnny]+ci[0+(j-1)*nnx+0*nnxnny]-2*ci[0+j*nnx+0*nnxnny])/tauiT+
-      (ci[0+j*nnx+(0+1)*nnxnny]+ci[0+j*nnx+(0+1)*nnxnny]-2*ci[0+j*nnx+0*nnxnny])/tauiT;
-    Ici[(nnx-1)+j*nnx+0*nnxnny]=(ci[(nnx-1)+j*nnx+0*nnxnny-1]+ci[(nnx-1)+j*nnx+0*nnxnny-1]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiL+
-      (ci[(nnx-1)+(j+1)*nnx+0*nnxnny]+ci[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiT+
-      (ci[(nnx-1)+j*nnx+(0+1)*nnxnny]+ci[(nnx-1)+j*nnx+(0+1)*nnxnny]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiT;
-    Ici[0+j*nnx+(nnz-1)*nnxnny]=(ci[0+j*nnx+(nnz-1)*nnxnny+1]+ci[0+j*nnx+(nnz-1)*nnxnny+1]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiL+
-      (ci[0+(j+1)*nnx+(nnz-1)*nnxnny]+ci[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiT+
-      (ci[0+j*nnx+((nnz-1)-1)*nnxnny]+ci[0+j*nnx+((nnz-1)-1)*nnxnny]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiT;
-    Ici[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiL+
-      (ci[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiT+
-      (ci[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Ici[0+j*nnx+k*nnxnny]=(ci[0+j*nnx+k*nnxnny+1]+ci[0+j*nnx+k*nnxnny+1]-2*ci[0+j*nnx+k*nnxnny])/tauiL+
-        (ci[0+(j+1)*nnx+k*nnxnny]+ci[0+(j-1)*nnx+k*nnxnny]-2*ci[0+j*nnx+k*nnxnny])/tauiT+
-        (ci[0+j*nnx+(k+1)*nnxnny]+ci[0+j*nnx+(k-1)*nnxnny]-2*ci[0+j*nnx+k*nnxnny])/tauiT;
-      Ici[(nnx-1)+j*nnx+k*nnxnny]=(ci[(nnx-1)+j*nnx+k*nnxnny-1]+ci[(nnx-1)+j*nnx+k*nnxnny-1]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiL+
-        (ci[(nnx-1)+(j+1)*nnx+k*nnxnny]+ci[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiT+
-        (ci[(nnx-1)+j*nnx+(k+1)*nnxnny]+ci[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiT;
-    }
-  }
-  //y fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int i=1;i<(nnx-1);i++)
-  {
-    Ici[i+0*nnx+0*nnxnny]=(ci[i+0*nnx+0*nnxnny+1]+ci[i+0*nnx+0*nnxnny-1]-2*ci[i+0*nnx+0*nnxnny])/tauiL+
-      (ci[i+(0+1)*nnx+0*nnxnny]+ci[i+(0+1)*nnx+0*nnxnny]-2*ci[i+0*nnx+0*nnxnny])/tauiT+
-      (ci[i+0*nnx+(0+1)*nnxnny]+ci[i+0*nnx+(0+1)*nnxnny]-2*ci[i+0*nnx+0*nnxnny])/tauiT;
-    Ici[i+(nny-1)*nnx+0*nnxnny]=(ci[i+(nny-1)*nnx+0*nnxnny+1]+ci[i+(nny-1)*nnx+0*nnxnny-1]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiL+
-      (ci[i+((nny-1)-1)*nnx+0*nnxnny]+ci[i+((nny-1)-1)*nnx+0*nnxnny]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiT+
-      (ci[i+(nny-1)*nnx+(0+1)*nnxnny]+ci[i+(nny-1)*nnx+(0+1)*nnxnny]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiT;
-    Ici[i+0*nnx+(nnz-1)*nnxnny]=(ci[i+0*nnx+(nnz-1)*nnxnny+1]+ci[i+0*nnx+(nnz-1)*nnxnny-1]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiL+
-      (ci[i+(0+1)*nnx+(nnz-1)*nnxnny]+ci[i+(0+1)*nnx+(nnz-1)*nnxnny]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiT+
-      (ci[i+0*nnx+((nnz-1)-1)*nnxnny]+ci[i+0*nnx+((nnz-1)-1)*nnxnny]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiT;
-    Ici[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+ci[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
-      (ci[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
-      (ci[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Ici[i+0*nnx+k*nnxnny]=(ci[i+0*nnx+k*nnxnny+1]+ci[i+0*nnx+k*nnxnny-1]-2*ci[i+0*nnx+k*nnxnny])/tauiL+
-        (ci[i+(0+1)*nnx+k*nnxnny]+ci[i+(0+1)*nnx+k*nnxnny]-2*ci[i+0*nnx+k*nnxnny])/tauiT+
-        (ci[i+0*nnx+(k+1)*nnxnny]+ci[i+0*nnx+(k-1)*nnxnny]-2*ci[i+0*nnx+k*nnxnny])/tauiT;
-      Ici[i+(nny-1)*nnx+k*nnxnny]=(ci[i+(nny-1)*nnx+k*nnxnny+1]+ci[i+(nny-1)*nnx+k*nnxnny-1]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiL+
-        (ci[i+((nny-1)-1)*nnx+k*nnxnny]+ci[i+((nny-1)-1)*nnx+k*nnxnny]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiT+
-        (ci[i+(nny-1)*nnx+(k+1)*nnxnny]+ci[i+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiT;
-    }
-    //z fixed
-#pragma ivdep
-#pragma vector always
-    for (int j=1;j<nny-1;j++)
-    {
-      Ici[i+j*nnx+0*nnxnny]=(ci[i+j*nnx+0*nnxnny+1]+ci[i+j*nnx+0*nnxnny-1]-2*ci[i+j*nnx+0*nnxnny])/tauiL+
-        (ci[i+(j+1)*nnx+0*nnxnny]+ci[i+(j-1)*nnx+0*nnxnny]-2*ci[i+j*nnx+0*nnxnny])/tauiT+
-        (ci[i+j*nnx+(0+1)*nnxnny]+ci[i+j*nnx+(0+1)*nnxnny]-2*ci[i+j*nnx+0*nnxnny])/tauiT;
-      Ici[i+j*nnx+(nnz-1)*nnxnny]=(ci[i+j*nnx+(nnz-1)*nnxnny+1]+ci[i+j*nnx+(nnz-1)*nnxnny-1]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiL+
-        (ci[i+(j+1)*nnx+(nnz-1)*nnxnny]+ci[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiT+
-        (ci[i+j*nnx+((nnz-1)-1)*nnxnny]+ci[i+j*nnx+((nnz-1)-1)*nnxnny]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiT;
-    }
-  }
-#pragma ivdep
-#pragma vector always
-  for (int k=1;k<nnz-1;k++)
-  {
-    Ici[0+0*nnx+k*nnxnny]=(ci[0+0*nnx+k*nnxnny+1]+ci[0+0*nnx+k*nnxnny+1]-2*ci[0+0*nnx+k*nnxnny])/tauiL+
-      (ci[0+(0+1)*nnx+k*nnxnny]+ci[0+(0+1)*nnx+k*nnxnny]-2*ci[0+0*nnx+k*nnxnny])/tauiT+
-      (ci[0+0*nnx+(k+1)*nnxnny]+ci[0+0*nnx+(k-1)*nnxnny]-2*ci[0+0*nnx+k*nnxnny])/tauiT;
-    Ici[0+(nny-1)*nnx+k*nnxnny]=(ci[0+(nny-1)*nnx+k*nnxnny+1]+ci[0+(nny-1)*nnx+k*nnxnny+1]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiL+
-      (ci[0+((nny-1)-1)*nnx+k*nnxnny]+ci[0+((nny-1)-1)*nnx+k*nnxnny]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiT+
-      (ci[0+(nny-1)*nnx+(k+1)*nnxnny]+ci[0+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiT;
-    Ici[(nnx-1)+0*nnx+k*nnxnny]=(ci[(nnx-1)+0*nnx+k*nnxnny-1]+ci[(nnx-1)+0*nnx+k*nnxnny-1]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiL+
-      (ci[(nnx-1)+(0+1)*nnx+k*nnxnny]+ci[(nnx-1)+(0+1)*nnx+k*nnxnny]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiT+
-      (ci[(nnx-1)+0*nnx+(k+1)*nnxnny]+ci[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiT;
-    Ici[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+ci[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiL+
-      (ci[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+ci[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiT+
-      (ci[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiT;
-  }
-
-#endif
-
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int k=1;k<nnz-1;k++)
-  {
-    for (int j=1;j<nny-1;j++)
-    {
-#pragma ivdep
-#pragma vector always
-      for (int i=1;i<nnx-1;i++)
+      Ici[0+j*nnx+0*nnxnny]=(ci[0+j*nnx+0*nnxnny+1]+ci[(nnx-1)+j*nnx+0*nnxnny]-2*ci[0+j*nnx+0*nnxnny])/tauiL+
+        (ci[0+(j+1)*nnx+0*nnxnny]+ci[0+(j-1)*nnx+0*nnxnny]-2*ci[0+j*nnx+0*nnxnny])/tauiT+
+        (ci[0+j*nnx+(0+1)*nnxnny]+ci[0+j*nnx+(nnz-1)*nnxnny]-2*ci[0+j*nnx+0*nnxnny])/tauiT;
+      Ici[(nnx-1)+j*nnx+0*nnxnny]=(ci[(nnx-1)+j*nnx+0*nnxnny-1]+ci[(0)+j*nnx+0*nnxnny]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiL+
+        (ci[(nnx-1)+(j+1)*nnx+0*nnxnny]+ci[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiT+
+        (ci[(nnx-1)+j*nnx+(0+1)*nnxnny]+ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiT;
+      Ici[0+j*nnx+(nnz-1)*nnxnny]=(ci[0+j*nnx+(nnz-1)*nnxnny+1]+ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiL+
+        (ci[0+(j+1)*nnx+(nnz-1)*nnxnny]+ci[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiT+
+        (ci[0+j*nnx+((nnz-1)-1)*nnxnny]+ci[0+j*nnx+(0)*nnxnny]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiT;
+      Ici[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+ci[(0)+j*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiL+
+        (ci[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiT+
+        (ci[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+j*nnx+(0)*nnxnny]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
       {
-        Ici[i+j*nnx+k*nnxnny]=(ci[i+j*nnx+k*nnxnny+1]+ci[i+j*nnx+k*nnxnny-1]-2*ci[i+j*nnx+k*nnxnny])/tauiL+
-          (ci[i+(j+1)*nnx+k*nnxnny]+ci[i+(j-1)*nnx+k*nnxnny]-2*ci[i+j*nnx+k*nnxnny])/tauiT+
-          (ci[i+j*nnx+(k+1)*nnxnny]+ci[i+j*nnx+(k-1)*nnxnny]-2*ci[i+j*nnx+k*nnxnny])/tauiT;
+        Ici[0+j*nnx+k*nnxnny]=(ci[0+j*nnx+k*nnxnny+1]+ci[(nnx-1)+j*nnx+k*nnxnny]-2*ci[0+j*nnx+k*nnxnny])/tauiL+
+          (ci[0+(j+1)*nnx+k*nnxnny]+ci[0+(j-1)*nnx+k*nnxnny]-2*ci[0+j*nnx+k*nnxnny])/tauiT+
+          (ci[0+j*nnx+(k+1)*nnxnny]+ci[0+j*nnx+(k-1)*nnxnny]-2*ci[0+j*nnx+k*nnxnny])/tauiT;
+        Ici[(nnx-1)+j*nnx+k*nnxnny]=(ci[(nnx-1)+j*nnx+k*nnxnny-1]+ci[(0)+j*nnx+k*nnxnny]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiL+
+          (ci[(nnx-1)+(j+1)*nnx+k*nnxnny]+ci[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiT+
+          (ci[(nnx-1)+j*nnx+(k+1)*nnxnny]+ci[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiT;
       }
     }
-  }
+    //y fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int i=1;i<(nnx-1);i++)
+    {
+      Ici[i+0*nnx+0*nnxnny]=(ci[i+0*nnx+0*nnxnny+1]+ci[i+0*nnx+0*nnxnny-1]-2*ci[i+0*nnx+0*nnxnny])/tauiL+
+        (ci[i+(0+1)*nnx+0*nnxnny]+ci[i+(nny-1)*nnx+0*nnxnny]-2*ci[i+0*nnx+0*nnxnny])/tauiT+
+        (ci[i+0*nnx+(0+1)*nnxnny]+ci[i+0*nnx+(nnz-1)*nnxnny]-2*ci[i+0*nnx+0*nnxnny])/tauiT;
+      Ici[i+(nny-1)*nnx+0*nnxnny]=(ci[i+(nny-1)*nnx+0*nnxnny+1]+ci[i+(nny-1)*nnx+0*nnxnny-1]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiL+
+        (ci[i+((nny-1)-1)*nnx+0*nnxnny]+ci[i+(0)*nnx+0*nnxnny]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiT+
+        (ci[i+(nny-1)*nnx+(0+1)*nnxnny]+ci[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiT;
+      Ici[i+0*nnx+(nnz-1)*nnxnny]=(ci[i+0*nnx+(nnz-1)*nnxnny+1]+ci[i+0*nnx+(nnz-1)*nnxnny-1]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiL+
+        (ci[i+(0+1)*nnx+(nnz-1)*nnxnny]+ci[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiT+
+        (ci[i+0*nnx+((nnz-1)-1)*nnxnny]+ci[i+0*nnx+(0)*nnxnny]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiT;
+      Ici[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+ci[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
+        (ci[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[i+(0)*nnx+(nnz-1)*nnxnny]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
+        (ci[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[i+(nny-1)*nnx+(0)*nnxnny]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        Ici[i+0*nnx+k*nnxnny]=(ci[i+0*nnx+k*nnxnny+1]+ci[i+0*nnx+k*nnxnny-1]-2*ci[i+0*nnx+k*nnxnny])/tauiL+
+          (ci[i+(0+1)*nnx+k*nnxnny]+ci[i+(nny-1)*nnx+k*nnxnny]-2*ci[i+0*nnx+k*nnxnny])/tauiT+
+          (ci[i+0*nnx+(k+1)*nnxnny]+ci[i+0*nnx+(k-1)*nnxnny]-2*ci[i+0*nnx+k*nnxnny])/tauiT;
+        Ici[i+(nny-1)*nnx+k*nnxnny]=(ci[i+(nny-1)*nnx+k*nnxnny+1]+ci[i+(nny-1)*nnx+k*nnxnny-1]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiL+
+          (ci[i+((nny-1)-1)*nnx+k*nnxnny]+ci[i+(0)*nnx+k*nnxnny]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiT+
+          (ci[i+(nny-1)*nnx+(k+1)*nnxnny]+ci[i+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiT;
+      }
+      //z fixed
+  #pragma ivdep
+  #pragma vector always
+      for (int j=1;j<nny-1;j++)
+      {
+        Ici[i+j*nnx+0*nnxnny]=(ci[i+j*nnx+0*nnxnny+1]+ci[i+j*nnx+0*nnxnny-1]-2*ci[i+j*nnx+0*nnxnny])/tauiL+
+          (ci[i+(j+1)*nnx+0*nnxnny]+ci[i+(j-1)*nnx+0*nnxnny]-2*ci[i+j*nnx+0*nnxnny])/tauiT+
+          (ci[i+j*nnx+(0+1)*nnxnny]+ci[i+j*nnx+(nnz-1)*nnxnny]-2*ci[i+j*nnx+0*nnxnny])/tauiT;
+        Ici[i+j*nnx+(nnz-1)*nnxnny]=(ci[i+j*nnx+(nnz-1)*nnxnny+1]+ci[i+j*nnx+(nnz-1)*nnxnny-1]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiL+
+          (ci[i+(j+1)*nnx+(nnz-1)*nnxnny]+ci[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiT+
+          (ci[i+j*nnx+((nnz-1)-1)*nnxnny]+ci[i+j*nnx+(0)*nnxnny]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiT;
+      }
+    }
+  #pragma ivdep
+  #pragma vector always
+    for (int k=1;k<nnz-1;k++)
+    {
+      Ici[0+0*nnx+k*nnxnny]=(ci[0+0*nnx+k*nnxnny+1]+ci[(nnx-1)+0*nnx+k*nnxnny]-2*ci[0+0*nnx+k*nnxnny])/tauiL+
+        (ci[0+(0+1)*nnx+k*nnxnny]+ci[0+(nny-1)*nnx+k*nnxnny]-2*ci[0+0*nnx+k*nnxnny])/tauiT+
+        (ci[0+0*nnx+(k+1)*nnxnny]+ci[0+0*nnx+(k-1)*nnxnny]-2*ci[0+0*nnx+k*nnxnny])/tauiT;
+      Ici[0+(nny-1)*nnx+k*nnxnny]=(ci[0+(nny-1)*nnx+k*nnxnny+1]+ci[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiL+
+        (ci[0+((nny-1)-1)*nnx+k*nnxnny]+ci[0+(0)*nnx+k*nnxnny]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiT+
+        (ci[0+(nny-1)*nnx+(k+1)*nnxnny]+ci[0+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiT;
+      Ici[(nnx-1)+0*nnx+k*nnxnny]=(ci[(nnx-1)+0*nnx+k*nnxnny-1]+ci[(0)+0*nnx+k*nnxnny]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiL+
+        (ci[(nnx-1)+(0+1)*nnx+k*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiT+
+        (ci[(nnx-1)+0*nnx+(k+1)*nnxnny]+ci[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiT;
+      Ici[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+ci[(0)+(nny-1)*nnx+k*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiL+
+        (ci[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+ci[(nnx-1)+(0)*nnx+k*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiT+
+        (ci[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiT;
+    }
+  #else
+    Ici[0+0*nnx+0*nnxnny]=(ci[0+0*nnx+0*nnxnny+1]+ci[0+0*nnx+0*nnxnny+1]-2*ci[0+0*nnx+0*nnxnny])/tauiL+
+      (ci[0+(0+1)*nnx+0*nnxnny]+ci[0+(0+1)*nnx+0*nnxnny]-2*ci[0+0*nnx+0*nnxnny])/tauiT+
+      (ci[0+0*nnx+(0+1)*nnxnny]+ci[0+0*nnx+(0+1)*nnxnny]-2*ci[0+0*nnx+0*nnxnny])/tauiT;
+    Ici[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+ci[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
+      (ci[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
+      (ci[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*ci[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
+    Ici[0+(nny-1)*nnx+0*nnxnny]=(ci[0+(nny-1)*nnx+0*nnxnny+1]+ci[0+(nny-1)*nnx+0*nnxnny+1]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiL+
+      (ci[0+((nny-1)-1)*nnx+0*nnxnny]+ci[0+((nny-1)-1)*nnx+0*nnxnny]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiT+
+      (ci[0+(nny-1)*nnx+(0+1)*nnxnny]+ci[0+(nny-1)*nnx+(0+1)*nnxnny]-2*ci[0+(nny-1)*nnx+0*nnxnny])/tauiT;
+    Ici[0+0*nnx+(nnz-1)*nnxnny]=(ci[0+0*nnx+(nnz-1)*nnxnny+1]+ci[0+0*nnx+(nnz-1)*nnxnny+1]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiL+
+      (ci[0+(0+1)*nnx+(nnz-1)*nnxnny]+ci[0+(0+1)*nnx+(nnz-1)*nnxnny]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiT+
+      (ci[0+0*nnx+((nnz-1)-1)*nnxnny]+ci[0+0*nnx+((nnz-1)-1)*nnxnny]-2*ci[0+0*nnx+(nnz-1)*nnxnny])/tauiT;
+    Ici[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+ci[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiL+
+      (ci[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+ci[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiT+
+      (ci[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tauiT;
+    Ici[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiL+
+      (ci[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiT+
+      (ci[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tauiT;
+    Ici[(nnx-1)+0*nnx+0*nnxnny]=(ci[(nnx-1)+0*nnx+0*nnxnny-1]+ci[(nnx-1)+0*nnx+0*nnxnny-1]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiL+
+      (ci[(nnx-1)+(0+1)*nnx+0*nnxnny]+ci[(nnx-1)+(0+1)*nnx+0*nnxnny]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiT+
+      (ci[(nnx-1)+0*nnx+(0+1)*nnxnny]+ci[(nnx-1)+0*nnx+(0+1)*nnxnny]-2*ci[(nnx-1)+0*nnx+0*nnxnny])/tauiT;
+    Ici[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
+      (ci[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
+      (ci[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
+    //x fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int j=1;j<nny-1;j++)
+    {
+      Ici[0+j*nnx+0*nnxnny]=(ci[0+j*nnx+0*nnxnny+1]+ci[0+j*nnx+0*nnxnny+1]-2*ci[0+j*nnx+0*nnxnny])/tauiL+
+        (ci[0+(j+1)*nnx+0*nnxnny]+ci[0+(j-1)*nnx+0*nnxnny]-2*ci[0+j*nnx+0*nnxnny])/tauiT+
+        (ci[0+j*nnx+(0+1)*nnxnny]+ci[0+j*nnx+(0+1)*nnxnny]-2*ci[0+j*nnx+0*nnxnny])/tauiT;
+      Ici[(nnx-1)+j*nnx+0*nnxnny]=(ci[(nnx-1)+j*nnx+0*nnxnny-1]+ci[(nnx-1)+j*nnx+0*nnxnny-1]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiL+
+        (ci[(nnx-1)+(j+1)*nnx+0*nnxnny]+ci[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiT+
+        (ci[(nnx-1)+j*nnx+(0+1)*nnxnny]+ci[(nnx-1)+j*nnx+(0+1)*nnxnny]-2*ci[(nnx-1)+j*nnx+0*nnxnny])/tauiT;
+      Ici[0+j*nnx+(nnz-1)*nnxnny]=(ci[0+j*nnx+(nnz-1)*nnxnny+1]+ci[0+j*nnx+(nnz-1)*nnxnny+1]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiL+
+        (ci[0+(j+1)*nnx+(nnz-1)*nnxnny]+ci[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiT+
+        (ci[0+j*nnx+((nnz-1)-1)*nnxnny]+ci[0+j*nnx+((nnz-1)-1)*nnxnny]-2*ci[0+j*nnx+(nnz-1)*nnxnny])/tauiT;
+      Ici[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiL+
+        (ci[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+ci[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiT+
+        (ci[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+ci[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tauiT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        Ici[0+j*nnx+k*nnxnny]=(ci[0+j*nnx+k*nnxnny+1]+ci[0+j*nnx+k*nnxnny+1]-2*ci[0+j*nnx+k*nnxnny])/tauiL+
+          (ci[0+(j+1)*nnx+k*nnxnny]+ci[0+(j-1)*nnx+k*nnxnny]-2*ci[0+j*nnx+k*nnxnny])/tauiT+
+          (ci[0+j*nnx+(k+1)*nnxnny]+ci[0+j*nnx+(k-1)*nnxnny]-2*ci[0+j*nnx+k*nnxnny])/tauiT;
+        Ici[(nnx-1)+j*nnx+k*nnxnny]=(ci[(nnx-1)+j*nnx+k*nnxnny-1]+ci[(nnx-1)+j*nnx+k*nnxnny-1]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiL+
+          (ci[(nnx-1)+(j+1)*nnx+k*nnxnny]+ci[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiT+
+          (ci[(nnx-1)+j*nnx+(k+1)*nnxnny]+ci[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+j*nnx+k*nnxnny])/tauiT;
+      }
+    }
+    //y fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int i=1;i<(nnx-1);i++)
+    {
+      Ici[i+0*nnx+0*nnxnny]=(ci[i+0*nnx+0*nnxnny+1]+ci[i+0*nnx+0*nnxnny-1]-2*ci[i+0*nnx+0*nnxnny])/tauiL+
+        (ci[i+(0+1)*nnx+0*nnxnny]+ci[i+(0+1)*nnx+0*nnxnny]-2*ci[i+0*nnx+0*nnxnny])/tauiT+
+        (ci[i+0*nnx+(0+1)*nnxnny]+ci[i+0*nnx+(0+1)*nnxnny]-2*ci[i+0*nnx+0*nnxnny])/tauiT;
+      Ici[i+(nny-1)*nnx+0*nnxnny]=(ci[i+(nny-1)*nnx+0*nnxnny+1]+ci[i+(nny-1)*nnx+0*nnxnny-1]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiL+
+        (ci[i+((nny-1)-1)*nnx+0*nnxnny]+ci[i+((nny-1)-1)*nnx+0*nnxnny]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiT+
+        (ci[i+(nny-1)*nnx+(0+1)*nnxnny]+ci[i+(nny-1)*nnx+(0+1)*nnxnny]-2*ci[i+(nny-1)*nnx+0*nnxnny])/tauiT;
+      Ici[i+0*nnx+(nnz-1)*nnxnny]=(ci[i+0*nnx+(nnz-1)*nnxnny+1]+ci[i+0*nnx+(nnz-1)*nnxnny-1]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiL+
+        (ci[i+(0+1)*nnx+(nnz-1)*nnxnny]+ci[i+(0+1)*nnx+(nnz-1)*nnxnny]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiT+
+        (ci[i+0*nnx+((nnz-1)-1)*nnxnny]+ci[i+0*nnx+((nnz-1)-1)*nnxnny]-2*ci[i+0*nnx+(nnz-1)*nnxnny])/tauiT;
+      Ici[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(ci[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+ci[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiL+
+        (ci[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+ci[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT+
+        (ci[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+ci[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*ci[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tauiT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        Ici[i+0*nnx+k*nnxnny]=(ci[i+0*nnx+k*nnxnny+1]+ci[i+0*nnx+k*nnxnny-1]-2*ci[i+0*nnx+k*nnxnny])/tauiL+
+          (ci[i+(0+1)*nnx+k*nnxnny]+ci[i+(0+1)*nnx+k*nnxnny]-2*ci[i+0*nnx+k*nnxnny])/tauiT+
+          (ci[i+0*nnx+(k+1)*nnxnny]+ci[i+0*nnx+(k-1)*nnxnny]-2*ci[i+0*nnx+k*nnxnny])/tauiT;
+        Ici[i+(nny-1)*nnx+k*nnxnny]=(ci[i+(nny-1)*nnx+k*nnxnny+1]+ci[i+(nny-1)*nnx+k*nnxnny-1]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiL+
+          (ci[i+((nny-1)-1)*nnx+k*nnxnny]+ci[i+((nny-1)-1)*nnx+k*nnxnny]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiT+
+          (ci[i+(nny-1)*nnx+(k+1)*nnxnny]+ci[i+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[i+(nny-1)*nnx+k*nnxnny])/tauiT;
+      }
+      //z fixed
+  #pragma ivdep
+  #pragma vector always
+      for (int j=1;j<nny-1;j++)
+      {
+        Ici[i+j*nnx+0*nnxnny]=(ci[i+j*nnx+0*nnxnny+1]+ci[i+j*nnx+0*nnxnny-1]-2*ci[i+j*nnx+0*nnxnny])/tauiL+
+          (ci[i+(j+1)*nnx+0*nnxnny]+ci[i+(j-1)*nnx+0*nnxnny]-2*ci[i+j*nnx+0*nnxnny])/tauiT+
+          (ci[i+j*nnx+(0+1)*nnxnny]+ci[i+j*nnx+(0+1)*nnxnny]-2*ci[i+j*nnx+0*nnxnny])/tauiT;
+        Ici[i+j*nnx+(nnz-1)*nnxnny]=(ci[i+j*nnx+(nnz-1)*nnxnny+1]+ci[i+j*nnx+(nnz-1)*nnxnny-1]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiL+
+          (ci[i+(j+1)*nnx+(nnz-1)*nnxnny]+ci[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiT+
+          (ci[i+j*nnx+((nnz-1)-1)*nnxnny]+ci[i+j*nnx+((nnz-1)-1)*nnxnny]-2*ci[i+j*nnx+(nnz-1)*nnxnny])/tauiT;
+      }
+    }
+  #pragma ivdep
+  #pragma vector always
+    for (int k=1;k<nnz-1;k++)
+    {
+      Ici[0+0*nnx+k*nnxnny]=(ci[0+0*nnx+k*nnxnny+1]+ci[0+0*nnx+k*nnxnny+1]-2*ci[0+0*nnx+k*nnxnny])/tauiL+
+        (ci[0+(0+1)*nnx+k*nnxnny]+ci[0+(0+1)*nnx+k*nnxnny]-2*ci[0+0*nnx+k*nnxnny])/tauiT+
+        (ci[0+0*nnx+(k+1)*nnxnny]+ci[0+0*nnx+(k-1)*nnxnny]-2*ci[0+0*nnx+k*nnxnny])/tauiT;
+      Ici[0+(nny-1)*nnx+k*nnxnny]=(ci[0+(nny-1)*nnx+k*nnxnny+1]+ci[0+(nny-1)*nnx+k*nnxnny+1]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiL+
+        (ci[0+((nny-1)-1)*nnx+k*nnxnny]+ci[0+((nny-1)-1)*nnx+k*nnxnny]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiT+
+        (ci[0+(nny-1)*nnx+(k+1)*nnxnny]+ci[0+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[0+(nny-1)*nnx+k*nnxnny])/tauiT;
+      Ici[(nnx-1)+0*nnx+k*nnxnny]=(ci[(nnx-1)+0*nnx+k*nnxnny-1]+ci[(nnx-1)+0*nnx+k*nnxnny-1]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiL+
+        (ci[(nnx-1)+(0+1)*nnx+k*nnxnny]+ci[(nnx-1)+(0+1)*nnx+k*nnxnny]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiT+
+        (ci[(nnx-1)+0*nnx+(k+1)*nnxnny]+ci[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+0*nnx+k*nnxnny])/tauiT;
+      Ici[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(ci[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+ci[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiL+
+        (ci[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+ci[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiT+
+        (ci[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+ci[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*ci[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tauiT;
+    }
+
+  #endif
+
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int k=1;k<nnz-1;k++)
+    {
+      for (int j=1;j<nny-1;j++)
+      {
+  #pragma ivdep
+  #pragma vector always
+        for (int i=1;i<nnx-1;i++)
+        {
+          Ici[i+j*nnx+k*nnxnny]=(ci[i+j*nnx+k*nnxnny+1]+ci[i+j*nnx+k*nnxnny-1]-2*ci[i+j*nnx+k*nnxnny])/tauiL+
+            (ci[i+(j+1)*nnx+k*nnxnny]+ci[i+(j-1)*nnx+k*nnxnny]-2*ci[i+j*nnx+k*nnxnny])/tauiT+
+            (ci[i+j*nnx+(k+1)*nnxnny]+ci[i+j*nnx+(k-1)*nnxnny]-2*ci[i+j*nnx+k*nnxnny])/tauiT;
+        }
+      }
+    }
 }
 void CSubcell::computeIcnsr(void)
 {
-#ifdef ___PERIODIC
-  //boundary
-  Icnsr[0+0*nnx+0*nnxnny]=(cnsr[0+0*nnx+0*nnxnny+1]+cnsr[(nnx-1)+0*nnx+0*nnxnny]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrL+
-    (cnsr[0+(0+1)*nnx+0*nnxnny]+cnsr[0+(nny-1)*nnx+0*nnxnny]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrT+
-    (cnsr[0+0*nnx+(0+1)*nnxnny]+cnsr[0+0*nnx+(nnz-1)*nnxnny]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrT;
-  Icnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
-    (cnsr[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[0+(0)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
-    (cnsr[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+(nny-1)*nnx+(0)*nnxnny]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
-  Icnsr[0+(nny-1)*nnx+0*nnxnny]=(cnsr[0+(nny-1)*nnx+0*nnxnny+1]+cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrL+
-    (cnsr[0+((nny-1)-1)*nnx+0*nnxnny]+cnsr[0+(0)*nnx+0*nnxnny]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrT+
-    (cnsr[0+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrT;
-  Icnsr[0+0*nnx+(nnz-1)*nnxnny]=(cnsr[0+0*nnx+(nnz-1)*nnxnny+1]+cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrL+
-    (cnsr[0+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrT+
-    (cnsr[0+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+0*nnx+(0)*nnxnny]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrT;
-  Icnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cnsr[(0)+(nny-1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrL+
-    (cnsr[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cnsr[(nnx-1)+(0)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrT+
-    (cnsr[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrT;
-  Icnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cnsr[(0)+0*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrL+
-    (cnsr[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrT+
-    (cnsr[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+0*nnx+(0)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrT;
-  Icnsr[(nnx-1)+0*nnx+0*nnxnny]=(cnsr[(nnx-1)+0*nnx+0*nnxnny-1]+cnsr[(0)+0*nnx+0*nnxnny]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrL+
-    (cnsr[(nnx-1)+(0+1)*nnx+0*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrT+
-    (cnsr[(nnx-1)+0*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrT;
-  Icnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cnsr[(0)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
-    (cnsr[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+(0)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
-    (cnsr[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(0)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
-  //x fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int j=1;j<nny-1;j++)
-  {
-    Icnsr[0+j*nnx+0*nnxnny]=(cnsr[0+j*nnx+0*nnxnny+1]+cnsr[(nnx-1)+j*nnx+0*nnxnny]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrL+
-      (cnsr[0+(j+1)*nnx+0*nnxnny]+cnsr[0+(j-1)*nnx+0*nnxnny]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrT+
-      (cnsr[0+j*nnx+(0+1)*nnxnny]+cnsr[0+j*nnx+(nnz-1)*nnxnny]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrT;
-    Icnsr[(nnx-1)+j*nnx+0*nnxnny]=(cnsr[(nnx-1)+j*nnx+0*nnxnny-1]+cnsr[(0)+j*nnx+0*nnxnny]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrL+
-      (cnsr[(nnx-1)+(j+1)*nnx+0*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrT+
-      (cnsr[(nnx-1)+j*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrT;
-    Icnsr[0+j*nnx+(nnz-1)*nnxnny]=(cnsr[0+j*nnx+(nnz-1)*nnxnny+1]+cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrL+
-      (cnsr[0+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrT+
-      (cnsr[0+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+j*nnx+(0)*nnxnny]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrT;
-    Icnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cnsr[(0)+j*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrL+
-      (cnsr[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrT+
-      (cnsr[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+j*nnx+(0)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Icnsr[0+j*nnx+k*nnxnny]=(cnsr[0+j*nnx+k*nnxnny+1]+cnsr[(nnx-1)+j*nnx+k*nnxnny]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrL+
-        (cnsr[0+(j+1)*nnx+k*nnxnny]+cnsr[0+(j-1)*nnx+k*nnxnny]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrT+
-        (cnsr[0+j*nnx+(k+1)*nnxnny]+cnsr[0+j*nnx+(k-1)*nnxnny]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrT;
-      Icnsr[(nnx-1)+j*nnx+k*nnxnny]=(cnsr[(nnx-1)+j*nnx+k*nnxnny-1]+cnsr[(0)+j*nnx+k*nnxnny]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrL+
-        (cnsr[(nnx-1)+(j+1)*nnx+k*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrT+
-        (cnsr[(nnx-1)+j*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrT;
-    }
-  }
-  //y fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int i=1;i<(nnx-1);i++)
-  {
-    Icnsr[i+0*nnx+0*nnxnny]=(cnsr[i+0*nnx+0*nnxnny+1]+cnsr[i+0*nnx+0*nnxnny-1]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrL+
-      (cnsr[i+(0+1)*nnx+0*nnxnny]+cnsr[i+(nny-1)*nnx+0*nnxnny]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrT+
-      (cnsr[i+0*nnx+(0+1)*nnxnny]+cnsr[i+0*nnx+(nnz-1)*nnxnny]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrT;
-    Icnsr[i+(nny-1)*nnx+0*nnxnny]=(cnsr[i+(nny-1)*nnx+0*nnxnny+1]+cnsr[i+(nny-1)*nnx+0*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrL+
-      (cnsr[i+((nny-1)-1)*nnx+0*nnxnny]+cnsr[i+(0)*nnx+0*nnxnny]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrT+
-      (cnsr[i+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrT;
-    Icnsr[i+0*nnx+(nnz-1)*nnxnny]=(cnsr[i+0*nnx+(nnz-1)*nnxnny+1]+cnsr[i+0*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrL+
-      (cnsr[i+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrT+
-      (cnsr[i+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+0*nnx+(0)*nnxnny]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrT;
-    Icnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
-      (cnsr[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[i+(0)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
-      (cnsr[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+(nny-1)*nnx+(0)*nnxnny]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Icnsr[i+0*nnx+k*nnxnny]=(cnsr[i+0*nnx+k*nnxnny+1]+cnsr[i+0*nnx+k*nnxnny-1]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrL+
-        (cnsr[i+(0+1)*nnx+k*nnxnny]+cnsr[i+(nny-1)*nnx+k*nnxnny]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrT+
-        (cnsr[i+0*nnx+(k+1)*nnxnny]+cnsr[i+0*nnx+(k-1)*nnxnny]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrT;
-      Icnsr[i+(nny-1)*nnx+k*nnxnny]=(cnsr[i+(nny-1)*nnx+k*nnxnny+1]+cnsr[i+(nny-1)*nnx+k*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrL+
-        (cnsr[i+((nny-1)-1)*nnx+k*nnxnny]+cnsr[i+(0)*nnx+k*nnxnny]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrT+
-        (cnsr[i+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[i+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrT;
-    }
-    //z fixed
-#pragma ivdep
-#pragma vector always
+  #ifdef ___PERIODIC
+    //boundary
+    Icnsr[0+0*nnx+0*nnxnny]=(cnsr[0+0*nnx+0*nnxnny+1]+cnsr[(nnx-1)+0*nnx+0*nnxnny]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrL+
+      (cnsr[0+(0+1)*nnx+0*nnxnny]+cnsr[0+(nny-1)*nnx+0*nnxnny]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrT+
+      (cnsr[0+0*nnx+(0+1)*nnxnny]+cnsr[0+0*nnx+(nnz-1)*nnxnny]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrT;
+    Icnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
+      (cnsr[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[0+(0)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
+      (cnsr[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+(nny-1)*nnx+(0)*nnxnny]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
+    Icnsr[0+(nny-1)*nnx+0*nnxnny]=(cnsr[0+(nny-1)*nnx+0*nnxnny+1]+cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrL+
+      (cnsr[0+((nny-1)-1)*nnx+0*nnxnny]+cnsr[0+(0)*nnx+0*nnxnny]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrT+
+      (cnsr[0+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrT;
+    Icnsr[0+0*nnx+(nnz-1)*nnxnny]=(cnsr[0+0*nnx+(nnz-1)*nnxnny+1]+cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrL+
+      (cnsr[0+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrT+
+      (cnsr[0+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+0*nnx+(0)*nnxnny]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrT;
+    Icnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cnsr[(0)+(nny-1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrL+
+      (cnsr[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cnsr[(nnx-1)+(0)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrT+
+      (cnsr[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrT;
+    Icnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cnsr[(0)+0*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrL+
+      (cnsr[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrT+
+      (cnsr[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+0*nnx+(0)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrT;
+    Icnsr[(nnx-1)+0*nnx+0*nnxnny]=(cnsr[(nnx-1)+0*nnx+0*nnxnny-1]+cnsr[(0)+0*nnx+0*nnxnny]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrL+
+      (cnsr[(nnx-1)+(0+1)*nnx+0*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrT+
+      (cnsr[(nnx-1)+0*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrT;
+    Icnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cnsr[(0)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
+      (cnsr[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+(0)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
+      (cnsr[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(0)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
+    //x fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
     for (int j=1;j<nny-1;j++)
     {
-      Icnsr[i+j*nnx+0*nnxnny]=(cnsr[i+j*nnx+0*nnxnny+1]+cnsr[i+j*nnx+0*nnxnny-1]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrL+
-        (cnsr[i+(j+1)*nnx+0*nnxnny]+cnsr[i+(j-1)*nnx+0*nnxnny]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrT+
-        (cnsr[i+j*nnx+(0+1)*nnxnny]+cnsr[i+j*nnx+(nnz-1)*nnxnny]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrT;
-      Icnsr[i+j*nnx+(nnz-1)*nnxnny]=(cnsr[i+j*nnx+(nnz-1)*nnxnny+1]+cnsr[i+j*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrL+
-        (cnsr[i+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrT+
-        (cnsr[i+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+j*nnx+(0)*nnxnny]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrT;
-    }
-  }
-#pragma ivdep
-#pragma vector always
-  for (int k=1;k<nnz-1;k++)
-  {
-    Icnsr[0+0*nnx+k*nnxnny]=(cnsr[0+0*nnx+k*nnxnny+1]+cnsr[(nnx-1)+0*nnx+k*nnxnny]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrL+
-      (cnsr[0+(0+1)*nnx+k*nnxnny]+cnsr[0+(nny-1)*nnx+k*nnxnny]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrT+
-      (cnsr[0+0*nnx+(k+1)*nnxnny]+cnsr[0+0*nnx+(k-1)*nnxnny]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrT;
-    Icnsr[0+(nny-1)*nnx+k*nnxnny]=(cnsr[0+(nny-1)*nnx+k*nnxnny+1]+cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrL+
-      (cnsr[0+((nny-1)-1)*nnx+k*nnxnny]+cnsr[0+(0)*nnx+k*nnxnny]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrT+
-      (cnsr[0+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[0+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrT;
-    Icnsr[(nnx-1)+0*nnx+k*nnxnny]=(cnsr[(nnx-1)+0*nnx+k*nnxnny-1]+cnsr[(0)+0*nnx+k*nnxnny]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrL+
-      (cnsr[(nnx-1)+(0+1)*nnx+k*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrT+
-      (cnsr[(nnx-1)+0*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrT;
-    Icnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cnsr[(0)+(nny-1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrL+
-      (cnsr[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cnsr[(nnx-1)+(0)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrT+
-      (cnsr[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrT;
-  }
-#else
-  //boundary
-
-  Icnsr[0+0*nnx+0*nnxnny]=(cnsr[0+0*nnx+0*nnxnny+1]+cnsr[0+0*nnx+0*nnxnny+1]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrL+
-    (cnsr[0+(0+1)*nnx+0*nnxnny]+cnsr[0+(0+1)*nnx+0*nnxnny]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrT+
-    (cnsr[0+0*nnx+(0+1)*nnxnny]+cnsr[0+0*nnx+(0+1)*nnxnny]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrT;
-  Icnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
-    (cnsr[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
-    (cnsr[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
-  Icnsr[0+(nny-1)*nnx+0*nnxnny]=(cnsr[0+(nny-1)*nnx+0*nnxnny+1]+cnsr[0+(nny-1)*nnx+0*nnxnny+1]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrL+
-    (cnsr[0+((nny-1)-1)*nnx+0*nnxnny]+cnsr[0+((nny-1)-1)*nnx+0*nnxnny]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrT+
-    (cnsr[0+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[0+(nny-1)*nnx+(0+1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrT;
-  Icnsr[0+0*nnx+(nnz-1)*nnxnny]=(cnsr[0+0*nnx+(nnz-1)*nnxnny+1]+cnsr[0+0*nnx+(nnz-1)*nnxnny+1]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrL+
-    (cnsr[0+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[0+(0+1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrT+
-    (cnsr[0+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+0*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrT;
-  Icnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrL+
-    (cnsr[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cnsr[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrT+
-    (cnsr[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrT;
-  Icnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrL+
-    (cnsr[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrT+
-    (cnsr[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrT;
-  Icnsr[(nnx-1)+0*nnx+0*nnxnny]=(cnsr[(nnx-1)+0*nnx+0*nnxnny-1]+cnsr[(nnx-1)+0*nnx+0*nnxnny-1]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrL+
-    (cnsr[(nnx-1)+(0+1)*nnx+0*nnxnny]+cnsr[(nnx-1)+(0+1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrT+
-    (cnsr[(nnx-1)+0*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+0*nnx+(0+1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrT;
-  Icnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
-    (cnsr[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
-    (cnsr[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
-  //x fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int j=1;j<nny-1;j++)
-  {
-    Icnsr[0+j*nnx+0*nnxnny]=(cnsr[0+j*nnx+0*nnxnny+1]+cnsr[0+j*nnx+0*nnxnny+1]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrL+
-      (cnsr[0+(j+1)*nnx+0*nnxnny]+cnsr[0+(j-1)*nnx+0*nnxnny]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrT+
-      (cnsr[0+j*nnx+(0+1)*nnxnny]+cnsr[0+j*nnx+(0+1)*nnxnny]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrT;
-    Icnsr[(nnx-1)+j*nnx+0*nnxnny]=(cnsr[(nnx-1)+j*nnx+0*nnxnny-1]+cnsr[(nnx-1)+j*nnx+0*nnxnny-1]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrL+
-      (cnsr[(nnx-1)+(j+1)*nnx+0*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrT+
-      (cnsr[(nnx-1)+j*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+j*nnx+(0+1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrT;
-    Icnsr[0+j*nnx+(nnz-1)*nnxnny]=(cnsr[0+j*nnx+(nnz-1)*nnxnny+1]+cnsr[0+j*nnx+(nnz-1)*nnxnny+1]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrL+
-      (cnsr[0+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrT+
-      (cnsr[0+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+j*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrT;
-    Icnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrL+
-      (cnsr[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrT+
-      (cnsr[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Icnsr[0+j*nnx+k*nnxnny]=(cnsr[0+j*nnx+k*nnxnny+1]+cnsr[0+j*nnx+k*nnxnny+1]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrL+
-        (cnsr[0+(j+1)*nnx+k*nnxnny]+cnsr[0+(j-1)*nnx+k*nnxnny]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrT+
-        (cnsr[0+j*nnx+(k+1)*nnxnny]+cnsr[0+j*nnx+(k-1)*nnxnny]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrT;
-      Icnsr[(nnx-1)+j*nnx+k*nnxnny]=(cnsr[(nnx-1)+j*nnx+k*nnxnny-1]+cnsr[(nnx-1)+j*nnx+k*nnxnny-1]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrL+
-        (cnsr[(nnx-1)+(j+1)*nnx+k*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrT+
-        (cnsr[(nnx-1)+j*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrT;
-    }
-  }
-  //y fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int i=1;i<(nnx-1);i++)
-  {
-    Icnsr[i+0*nnx+0*nnxnny]=(cnsr[i+0*nnx+0*nnxnny+1]+cnsr[i+0*nnx+0*nnxnny-1]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrL+
-      (cnsr[i+(0+1)*nnx+0*nnxnny]+cnsr[i+(0+1)*nnx+0*nnxnny]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrT+
-      (cnsr[i+0*nnx+(0+1)*nnxnny]+cnsr[i+0*nnx+(0+1)*nnxnny]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrT;
-    Icnsr[i+(nny-1)*nnx+0*nnxnny]=(cnsr[i+(nny-1)*nnx+0*nnxnny+1]+cnsr[i+(nny-1)*nnx+0*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrL+
-      (cnsr[i+((nny-1)-1)*nnx+0*nnxnny]+cnsr[i+((nny-1)-1)*nnx+0*nnxnny]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrT+
-      (cnsr[i+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[i+(nny-1)*nnx+(0+1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrT;
-    Icnsr[i+0*nnx+(nnz-1)*nnxnny]=(cnsr[i+0*nnx+(nnz-1)*nnxnny+1]+cnsr[i+0*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrL+
-      (cnsr[i+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[i+(0+1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrT+
-      (cnsr[i+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+0*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrT;
-    Icnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
-      (cnsr[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
-      (cnsr[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Icnsr[i+0*nnx+k*nnxnny]=(cnsr[i+0*nnx+k*nnxnny+1]+cnsr[i+0*nnx+k*nnxnny-1]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrL+
-        (cnsr[i+(0+1)*nnx+k*nnxnny]+cnsr[i+(0+1)*nnx+k*nnxnny]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrT+
-        (cnsr[i+0*nnx+(k+1)*nnxnny]+cnsr[i+0*nnx+(k-1)*nnxnny]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrT;
-      Icnsr[i+(nny-1)*nnx+k*nnxnny]=(cnsr[i+(nny-1)*nnx+k*nnxnny+1]+cnsr[i+(nny-1)*nnx+k*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrL+
-        (cnsr[i+((nny-1)-1)*nnx+k*nnxnny]+cnsr[i+((nny-1)-1)*nnx+k*nnxnny]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrT+
-        (cnsr[i+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[i+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrT;
-    }
-    //z fixed
-#pragma ivdep
-#pragma vector always
-    for (int j=1;j<nny-1;j++)
-    {
-      Icnsr[i+j*nnx+0*nnxnny]=(cnsr[i+j*nnx+0*nnxnny+1]+cnsr[i+j*nnx+0*nnxnny-1]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrL+
-        (cnsr[i+(j+1)*nnx+0*nnxnny]+cnsr[i+(j-1)*nnx+0*nnxnny]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrT+
-        (cnsr[i+j*nnx+(0+1)*nnxnny]+cnsr[i+j*nnx+(0+1)*nnxnny]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrT;
-      Icnsr[i+j*nnx+(nnz-1)*nnxnny]=(cnsr[i+j*nnx+(nnz-1)*nnxnny+1]+cnsr[i+j*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrL+
-        (cnsr[i+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrT+
-        (cnsr[i+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+j*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrT;
-    }
-  }
-#pragma ivdep
-#pragma vector always
-  for (int k=1;k<nnz-1;k++)
-  {
-    Icnsr[0+0*nnx+k*nnxnny]=(cnsr[0+0*nnx+k*nnxnny+1]+cnsr[0+0*nnx+k*nnxnny+1]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrL+
-      (cnsr[0+(0+1)*nnx+k*nnxnny]+cnsr[0+(0+1)*nnx+k*nnxnny]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrT+
-      (cnsr[0+0*nnx+(k+1)*nnxnny]+cnsr[0+0*nnx+(k-1)*nnxnny]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrT;
-    Icnsr[0+(nny-1)*nnx+k*nnxnny]=(cnsr[0+(nny-1)*nnx+k*nnxnny+1]+cnsr[0+(nny-1)*nnx+k*nnxnny+1]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrL+
-      (cnsr[0+((nny-1)-1)*nnx+k*nnxnny]+cnsr[0+((nny-1)-1)*nnx+k*nnxnny]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrT+
-      (cnsr[0+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[0+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrT;
-    Icnsr[(nnx-1)+0*nnx+k*nnxnny]=(cnsr[(nnx-1)+0*nnx+k*nnxnny-1]+cnsr[(nnx-1)+0*nnx+k*nnxnny-1]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrL+
-      (cnsr[(nnx-1)+(0+1)*nnx+k*nnxnny]+cnsr[(nnx-1)+(0+1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrT+
-      (cnsr[(nnx-1)+0*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrT;
-    Icnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrL+
-      (cnsr[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cnsr[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrT+
-      (cnsr[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrT;
-  }
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int k=1;k<nnz-1;k++)
-  {
-    for (int j=1;j<nny-1;j++)
-    {
-#pragma ivdep
-#pragma vector always
-      for (int i=1;i<nnx-1;i++)
+      Icnsr[0+j*nnx+0*nnxnny]=(cnsr[0+j*nnx+0*nnxnny+1]+cnsr[(nnx-1)+j*nnx+0*nnxnny]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrL+
+        (cnsr[0+(j+1)*nnx+0*nnxnny]+cnsr[0+(j-1)*nnx+0*nnxnny]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrT+
+        (cnsr[0+j*nnx+(0+1)*nnxnny]+cnsr[0+j*nnx+(nnz-1)*nnxnny]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrT;
+      Icnsr[(nnx-1)+j*nnx+0*nnxnny]=(cnsr[(nnx-1)+j*nnx+0*nnxnny-1]+cnsr[(0)+j*nnx+0*nnxnny]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrL+
+        (cnsr[(nnx-1)+(j+1)*nnx+0*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrT+
+        (cnsr[(nnx-1)+j*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrT;
+      Icnsr[0+j*nnx+(nnz-1)*nnxnny]=(cnsr[0+j*nnx+(nnz-1)*nnxnny+1]+cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrL+
+        (cnsr[0+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrT+
+        (cnsr[0+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+j*nnx+(0)*nnxnny]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrT;
+      Icnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cnsr[(0)+j*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrL+
+        (cnsr[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrT+
+        (cnsr[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+j*nnx+(0)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
       {
-        Icnsr[i+j*nnx+k*nnxnny]=(cnsr[i+j*nnx+k*nnxnny+1]+cnsr[i+j*nnx+k*nnxnny-1]-2*cnsr[i+j*nnx+k*nnxnny])/taunsrL+
-          (cnsr[i+(j+1)*nnx+k*nnxnny]+cnsr[i+(j-1)*nnx+k*nnxnny]-2*cnsr[i+j*nnx+k*nnxnny])/taunsrT+
-          (cnsr[i+j*nnx+(k+1)*nnxnny]+cnsr[i+j*nnx+(k-1)*nnxnny]-2*cnsr[i+j*nnx+k*nnxnny])/taunsrT;
+        Icnsr[0+j*nnx+k*nnxnny]=(cnsr[0+j*nnx+k*nnxnny+1]+cnsr[(nnx-1)+j*nnx+k*nnxnny]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrL+
+          (cnsr[0+(j+1)*nnx+k*nnxnny]+cnsr[0+(j-1)*nnx+k*nnxnny]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrT+
+          (cnsr[0+j*nnx+(k+1)*nnxnny]+cnsr[0+j*nnx+(k-1)*nnxnny]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrT;
+        Icnsr[(nnx-1)+j*nnx+k*nnxnny]=(cnsr[(nnx-1)+j*nnx+k*nnxnny-1]+cnsr[(0)+j*nnx+k*nnxnny]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrL+
+          (cnsr[(nnx-1)+(j+1)*nnx+k*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrT+
+          (cnsr[(nnx-1)+j*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrT;
       }
     }
-  }
+    //y fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int i=1;i<(nnx-1);i++)
+    {
+      Icnsr[i+0*nnx+0*nnxnny]=(cnsr[i+0*nnx+0*nnxnny+1]+cnsr[i+0*nnx+0*nnxnny-1]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrL+
+        (cnsr[i+(0+1)*nnx+0*nnxnny]+cnsr[i+(nny-1)*nnx+0*nnxnny]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrT+
+        (cnsr[i+0*nnx+(0+1)*nnxnny]+cnsr[i+0*nnx+(nnz-1)*nnxnny]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrT;
+      Icnsr[i+(nny-1)*nnx+0*nnxnny]=(cnsr[i+(nny-1)*nnx+0*nnxnny+1]+cnsr[i+(nny-1)*nnx+0*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrL+
+        (cnsr[i+((nny-1)-1)*nnx+0*nnxnny]+cnsr[i+(0)*nnx+0*nnxnny]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrT+
+        (cnsr[i+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrT;
+      Icnsr[i+0*nnx+(nnz-1)*nnxnny]=(cnsr[i+0*nnx+(nnz-1)*nnxnny+1]+cnsr[i+0*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrL+
+        (cnsr[i+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrT+
+        (cnsr[i+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+0*nnx+(0)*nnxnny]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrT;
+      Icnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
+        (cnsr[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[i+(0)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
+        (cnsr[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+(nny-1)*nnx+(0)*nnxnny]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        Icnsr[i+0*nnx+k*nnxnny]=(cnsr[i+0*nnx+k*nnxnny+1]+cnsr[i+0*nnx+k*nnxnny-1]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrL+
+          (cnsr[i+(0+1)*nnx+k*nnxnny]+cnsr[i+(nny-1)*nnx+k*nnxnny]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrT+
+          (cnsr[i+0*nnx+(k+1)*nnxnny]+cnsr[i+0*nnx+(k-1)*nnxnny]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrT;
+        Icnsr[i+(nny-1)*nnx+k*nnxnny]=(cnsr[i+(nny-1)*nnx+k*nnxnny+1]+cnsr[i+(nny-1)*nnx+k*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrL+
+          (cnsr[i+((nny-1)-1)*nnx+k*nnxnny]+cnsr[i+(0)*nnx+k*nnxnny]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrT+
+          (cnsr[i+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[i+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrT;
+      }
+      //z fixed
+  #pragma ivdep
+  #pragma vector always
+      for (int j=1;j<nny-1;j++)
+      {
+        Icnsr[i+j*nnx+0*nnxnny]=(cnsr[i+j*nnx+0*nnxnny+1]+cnsr[i+j*nnx+0*nnxnny-1]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrL+
+          (cnsr[i+(j+1)*nnx+0*nnxnny]+cnsr[i+(j-1)*nnx+0*nnxnny]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrT+
+          (cnsr[i+j*nnx+(0+1)*nnxnny]+cnsr[i+j*nnx+(nnz-1)*nnxnny]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrT;
+        Icnsr[i+j*nnx+(nnz-1)*nnxnny]=(cnsr[i+j*nnx+(nnz-1)*nnxnny+1]+cnsr[i+j*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrL+
+          (cnsr[i+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrT+
+          (cnsr[i+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+j*nnx+(0)*nnxnny]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrT;
+      }
+    }
+  #pragma ivdep
+  #pragma vector always
+    for (int k=1;k<nnz-1;k++)
+    {
+      Icnsr[0+0*nnx+k*nnxnny]=(cnsr[0+0*nnx+k*nnxnny+1]+cnsr[(nnx-1)+0*nnx+k*nnxnny]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrL+
+        (cnsr[0+(0+1)*nnx+k*nnxnny]+cnsr[0+(nny-1)*nnx+k*nnxnny]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrT+
+        (cnsr[0+0*nnx+(k+1)*nnxnny]+cnsr[0+0*nnx+(k-1)*nnxnny]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrT;
+      Icnsr[0+(nny-1)*nnx+k*nnxnny]=(cnsr[0+(nny-1)*nnx+k*nnxnny+1]+cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrL+
+        (cnsr[0+((nny-1)-1)*nnx+k*nnxnny]+cnsr[0+(0)*nnx+k*nnxnny]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrT+
+        (cnsr[0+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[0+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrT;
+      Icnsr[(nnx-1)+0*nnx+k*nnxnny]=(cnsr[(nnx-1)+0*nnx+k*nnxnny-1]+cnsr[(0)+0*nnx+k*nnxnny]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrL+
+        (cnsr[(nnx-1)+(0+1)*nnx+k*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrT+
+        (cnsr[(nnx-1)+0*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrT;
+      Icnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cnsr[(0)+(nny-1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrL+
+        (cnsr[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cnsr[(nnx-1)+(0)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrT+
+        (cnsr[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrT;
+    }
+  #else
+    //boundary
+
+    Icnsr[0+0*nnx+0*nnxnny]=(cnsr[0+0*nnx+0*nnxnny+1]+cnsr[0+0*nnx+0*nnxnny+1]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrL+
+      (cnsr[0+(0+1)*nnx+0*nnxnny]+cnsr[0+(0+1)*nnx+0*nnxnny]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrT+
+      (cnsr[0+0*nnx+(0+1)*nnxnny]+cnsr[0+0*nnx+(0+1)*nnxnny]-2*cnsr[0+0*nnx+0*nnxnny])/taunsrT;
+    Icnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
+      (cnsr[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
+      (cnsr[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
+    Icnsr[0+(nny-1)*nnx+0*nnxnny]=(cnsr[0+(nny-1)*nnx+0*nnxnny+1]+cnsr[0+(nny-1)*nnx+0*nnxnny+1]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrL+
+      (cnsr[0+((nny-1)-1)*nnx+0*nnxnny]+cnsr[0+((nny-1)-1)*nnx+0*nnxnny]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrT+
+      (cnsr[0+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[0+(nny-1)*nnx+(0+1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+0*nnxnny])/taunsrT;
+    Icnsr[0+0*nnx+(nnz-1)*nnxnny]=(cnsr[0+0*nnx+(nnz-1)*nnxnny+1]+cnsr[0+0*nnx+(nnz-1)*nnxnny+1]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrL+
+      (cnsr[0+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[0+(0+1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrT+
+      (cnsr[0+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+0*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[0+0*nnx+(nnz-1)*nnxnny])/taunsrT;
+    Icnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrL+
+      (cnsr[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cnsr[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrT+
+      (cnsr[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+0*nnxnny])/taunsrT;
+    Icnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrL+
+      (cnsr[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrT+
+      (cnsr[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/taunsrT;
+    Icnsr[(nnx-1)+0*nnx+0*nnxnny]=(cnsr[(nnx-1)+0*nnx+0*nnxnny-1]+cnsr[(nnx-1)+0*nnx+0*nnxnny-1]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrL+
+      (cnsr[(nnx-1)+(0+1)*nnx+0*nnxnny]+cnsr[(nnx-1)+(0+1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrT+
+      (cnsr[(nnx-1)+0*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+0*nnx+(0+1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+0*nnxnny])/taunsrT;
+    Icnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
+      (cnsr[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
+      (cnsr[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
+    //x fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int j=1;j<nny-1;j++)
+    {
+      Icnsr[0+j*nnx+0*nnxnny]=(cnsr[0+j*nnx+0*nnxnny+1]+cnsr[0+j*nnx+0*nnxnny+1]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrL+
+        (cnsr[0+(j+1)*nnx+0*nnxnny]+cnsr[0+(j-1)*nnx+0*nnxnny]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrT+
+        (cnsr[0+j*nnx+(0+1)*nnxnny]+cnsr[0+j*nnx+(0+1)*nnxnny]-2*cnsr[0+j*nnx+0*nnxnny])/taunsrT;
+      Icnsr[(nnx-1)+j*nnx+0*nnxnny]=(cnsr[(nnx-1)+j*nnx+0*nnxnny-1]+cnsr[(nnx-1)+j*nnx+0*nnxnny-1]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrL+
+        (cnsr[(nnx-1)+(j+1)*nnx+0*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrT+
+        (cnsr[(nnx-1)+j*nnx+(0+1)*nnxnny]+cnsr[(nnx-1)+j*nnx+(0+1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+0*nnxnny])/taunsrT;
+      Icnsr[0+j*nnx+(nnz-1)*nnxnny]=(cnsr[0+j*nnx+(nnz-1)*nnxnny+1]+cnsr[0+j*nnx+(nnz-1)*nnxnny+1]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrL+
+        (cnsr[0+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrT+
+        (cnsr[0+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[0+j*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[0+j*nnx+(nnz-1)*nnxnny])/taunsrT;
+      Icnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrL+
+        (cnsr[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrT+
+        (cnsr[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/taunsrT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        Icnsr[0+j*nnx+k*nnxnny]=(cnsr[0+j*nnx+k*nnxnny+1]+cnsr[0+j*nnx+k*nnxnny+1]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrL+
+          (cnsr[0+(j+1)*nnx+k*nnxnny]+cnsr[0+(j-1)*nnx+k*nnxnny]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrT+
+          (cnsr[0+j*nnx+(k+1)*nnxnny]+cnsr[0+j*nnx+(k-1)*nnxnny]-2*cnsr[0+j*nnx+k*nnxnny])/taunsrT;
+        Icnsr[(nnx-1)+j*nnx+k*nnxnny]=(cnsr[(nnx-1)+j*nnx+k*nnxnny-1]+cnsr[(nnx-1)+j*nnx+k*nnxnny-1]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrL+
+          (cnsr[(nnx-1)+(j+1)*nnx+k*nnxnny]+cnsr[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrT+
+          (cnsr[(nnx-1)+j*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+j*nnx+k*nnxnny])/taunsrT;
+      }
+    }
+    //y fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int i=1;i<(nnx-1);i++)
+    {
+      Icnsr[i+0*nnx+0*nnxnny]=(cnsr[i+0*nnx+0*nnxnny+1]+cnsr[i+0*nnx+0*nnxnny-1]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrL+
+        (cnsr[i+(0+1)*nnx+0*nnxnny]+cnsr[i+(0+1)*nnx+0*nnxnny]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrT+
+        (cnsr[i+0*nnx+(0+1)*nnxnny]+cnsr[i+0*nnx+(0+1)*nnxnny]-2*cnsr[i+0*nnx+0*nnxnny])/taunsrT;
+      Icnsr[i+(nny-1)*nnx+0*nnxnny]=(cnsr[i+(nny-1)*nnx+0*nnxnny+1]+cnsr[i+(nny-1)*nnx+0*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrL+
+        (cnsr[i+((nny-1)-1)*nnx+0*nnxnny]+cnsr[i+((nny-1)-1)*nnx+0*nnxnny]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrT+
+        (cnsr[i+(nny-1)*nnx+(0+1)*nnxnny]+cnsr[i+(nny-1)*nnx+(0+1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+0*nnxnny])/taunsrT;
+      Icnsr[i+0*nnx+(nnz-1)*nnxnny]=(cnsr[i+0*nnx+(nnz-1)*nnxnny+1]+cnsr[i+0*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrL+
+        (cnsr[i+(0+1)*nnx+(nnz-1)*nnxnny]+cnsr[i+(0+1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrT+
+        (cnsr[i+0*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+0*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[i+0*nnx+(nnz-1)*nnxnny])/taunsrT;
+      Icnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrL+
+        (cnsr[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cnsr[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT+
+        (cnsr[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+(nnz-1)*nnxnny])/taunsrT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        Icnsr[i+0*nnx+k*nnxnny]=(cnsr[i+0*nnx+k*nnxnny+1]+cnsr[i+0*nnx+k*nnxnny-1]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrL+
+          (cnsr[i+(0+1)*nnx+k*nnxnny]+cnsr[i+(0+1)*nnx+k*nnxnny]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrT+
+          (cnsr[i+0*nnx+(k+1)*nnxnny]+cnsr[i+0*nnx+(k-1)*nnxnny]-2*cnsr[i+0*nnx+k*nnxnny])/taunsrT;
+        Icnsr[i+(nny-1)*nnx+k*nnxnny]=(cnsr[i+(nny-1)*nnx+k*nnxnny+1]+cnsr[i+(nny-1)*nnx+k*nnxnny-1]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrL+
+          (cnsr[i+((nny-1)-1)*nnx+k*nnxnny]+cnsr[i+((nny-1)-1)*nnx+k*nnxnny]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrT+
+          (cnsr[i+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[i+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[i+(nny-1)*nnx+k*nnxnny])/taunsrT;
+      }
+      //z fixed
+  #pragma ivdep
+  #pragma vector always
+      for (int j=1;j<nny-1;j++)
+      {
+        Icnsr[i+j*nnx+0*nnxnny]=(cnsr[i+j*nnx+0*nnxnny+1]+cnsr[i+j*nnx+0*nnxnny-1]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrL+
+          (cnsr[i+(j+1)*nnx+0*nnxnny]+cnsr[i+(j-1)*nnx+0*nnxnny]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrT+
+          (cnsr[i+j*nnx+(0+1)*nnxnny]+cnsr[i+j*nnx+(0+1)*nnxnny]-2*cnsr[i+j*nnx+0*nnxnny])/taunsrT;
+        Icnsr[i+j*nnx+(nnz-1)*nnxnny]=(cnsr[i+j*nnx+(nnz-1)*nnxnny+1]+cnsr[i+j*nnx+(nnz-1)*nnxnny-1]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrL+
+          (cnsr[i+(j+1)*nnx+(nnz-1)*nnxnny]+cnsr[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrT+
+          (cnsr[i+j*nnx+((nnz-1)-1)*nnxnny]+cnsr[i+j*nnx+((nnz-1)-1)*nnxnny]-2*cnsr[i+j*nnx+(nnz-1)*nnxnny])/taunsrT;
+      }
+    }
+  #pragma ivdep
+  #pragma vector always
+    for (int k=1;k<nnz-1;k++)
+    {
+      Icnsr[0+0*nnx+k*nnxnny]=(cnsr[0+0*nnx+k*nnxnny+1]+cnsr[0+0*nnx+k*nnxnny+1]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrL+
+        (cnsr[0+(0+1)*nnx+k*nnxnny]+cnsr[0+(0+1)*nnx+k*nnxnny]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrT+
+        (cnsr[0+0*nnx+(k+1)*nnxnny]+cnsr[0+0*nnx+(k-1)*nnxnny]-2*cnsr[0+0*nnx+k*nnxnny])/taunsrT;
+      Icnsr[0+(nny-1)*nnx+k*nnxnny]=(cnsr[0+(nny-1)*nnx+k*nnxnny+1]+cnsr[0+(nny-1)*nnx+k*nnxnny+1]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrL+
+        (cnsr[0+((nny-1)-1)*nnx+k*nnxnny]+cnsr[0+((nny-1)-1)*nnx+k*nnxnny]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrT+
+        (cnsr[0+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[0+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[0+(nny-1)*nnx+k*nnxnny])/taunsrT;
+      Icnsr[(nnx-1)+0*nnx+k*nnxnny]=(cnsr[(nnx-1)+0*nnx+k*nnxnny-1]+cnsr[(nnx-1)+0*nnx+k*nnxnny-1]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrL+
+        (cnsr[(nnx-1)+(0+1)*nnx+k*nnxnny]+cnsr[(nnx-1)+(0+1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrT+
+        (cnsr[(nnx-1)+0*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+0*nnx+k*nnxnny])/taunsrT;
+      Icnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrL+
+        (cnsr[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cnsr[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrT+
+        (cnsr[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cnsr[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*cnsr[(nnx-1)+(nny-1)*nnx+k*nnxnny])/taunsrT;
+    }
+  #endif
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int k=1;k<nnz-1;k++)
+    {
+      for (int j=1;j<nny-1;j++)
+      {
+  #pragma ivdep
+  #pragma vector always
+        for (int i=1;i<nnx-1;i++)
+        {
+          Icnsr[i+j*nnx+k*nnxnny]=(cnsr[i+j*nnx+k*nnxnny+1]+cnsr[i+j*nnx+k*nnxnny-1]-2*cnsr[i+j*nnx+k*nnxnny])/taunsrL+
+            (cnsr[i+(j+1)*nnx+k*nnxnny]+cnsr[i+(j-1)*nnx+k*nnxnny]-2*cnsr[i+j*nnx+k*nnxnny])/taunsrT+
+            (cnsr[i+j*nnx+(k+1)*nnxnny]+cnsr[i+j*nnx+(k-1)*nnxnny]-2*cnsr[i+j*nnx+k*nnxnny])/taunsrT;
+        }
+      }
+    }
 }
 
 
 #ifdef ___NO_CS_BUFFER
 void CSubcell::computecsmn(void)
 {
-#ifdef ___PERIODIC
-  csmn[0+0*nnx+0*nnxnny]=(cs[0+0*nnx+0*nnxnny+1]+cs[(nnx-1)+0*nnx+0*nnxnny])/tausL+
-    (cs[0+(0+1)*nnx+0*nnxnny]+cs[0+(nny-1)*nnx+0*nnxnny])/tausT+
-    (cs[0+0*nnx+(0+1)*nnxnny]+cs[0+0*nnx+(nnz-1)*nnxnny])/tausT;
-  csmn[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[0+(0)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[0+(nny-1)*nnx+(0)*nnxnny])/tausT;
-  csmn[0+(nny-1)*nnx+0*nnxnny]=(cs[0+(nny-1)*nnx+0*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausL+
-    (cs[0+((nny-1)-1)*nnx+0*nnxnny]+cs[0+(0)*nnx+0*nnxnny])/tausT+
-    (cs[0+(nny-1)*nnx+(0+1)*nnxnny]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
-  csmn[0+0*nnx+(nnz-1)*nnxnny]=(cs[0+0*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[0+(0+1)*nnx+(nnz-1)*nnxnny]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[0+0*nnx+((nnz-1)-1)*nnxnny]+cs[0+0*nnx+(0)*nnxnny])/tausT;
-  csmn[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cs[(0)+(nny-1)*nnx+0*nnxnny])/tausL+
-    (cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cs[(nnx-1)+(0)*nnx+0*nnxnny])/tausT+
-    (cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
-  csmn[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cs[(0)+0*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+0*nnx+(0)*nnxnny])/tausT;
-  csmn[(nnx-1)+0*nnx+0*nnxnny]=(cs[(nnx-1)+0*nnx+0*nnxnny-1]+cs[(0)+0*nnx+0*nnxnny])/tausL+
-    (cs[(nnx-1)+(0+1)*nnx+0*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausT+
-    (cs[(nnx-1)+0*nnx+(0+1)*nnxnny]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausT;
-  csmn[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cs[(0)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(0)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(0)*nnxnny])/tausT;
-  //x fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int j=1;j<nny-1;j++)
-  {
-    csmn[0+j*nnx+0*nnxnny]=(cs[0+j*nnx+0*nnxnny+1]+cs[(nnx-1)+j*nnx+0*nnxnny])/tausL+
-      (cs[0+(j+1)*nnx+0*nnxnny]+cs[0+(j-1)*nnx+0*nnxnny])/tausT+
-      (cs[0+j*nnx+(0+1)*nnxnny]+cs[0+j*nnx+(nnz-1)*nnxnny])/tausT;
-    csmn[(nnx-1)+j*nnx+0*nnxnny]=(cs[(nnx-1)+j*nnx+0*nnxnny-1]+cs[(0)+j*nnx+0*nnxnny])/tausL+
-      (cs[(nnx-1)+(j+1)*nnx+0*nnxnny]+cs[(nnx-1)+(j-1)*nnx+0*nnxnny])/tausT+
-      (cs[(nnx-1)+j*nnx+(0+1)*nnxnny]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausT;
-    csmn[0+j*nnx+(nnz-1)*nnxnny]=(cs[0+j*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausL+
-      (cs[0+(j+1)*nnx+(nnz-1)*nnxnny]+cs[0+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[0+j*nnx+((nnz-1)-1)*nnxnny]+cs[0+j*nnx+(0)*nnxnny])/tausT;
-    csmn[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cs[(0)+j*nnx+(nnz-1)*nnxnny])/tausL+
-      (cs[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+j*nnx+(0)*nnxnny])/tausT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      csmn[0+j*nnx+k*nnxnny]=(cs[0+j*nnx+k*nnxnny+1]+cs[(nnx-1)+j*nnx+k*nnxnny])/tausL+
-        (cs[0+(j+1)*nnx+k*nnxnny]+cs[0+(j-1)*nnx+k*nnxnny])/tausT+
-        (cs[0+j*nnx+(k+1)*nnxnny]+cs[0+j*nnx+(k-1)*nnxnny])/tausT;
-      csmn[(nnx-1)+j*nnx+k*nnxnny]=(cs[(nnx-1)+j*nnx+k*nnxnny-1]+cs[(0)+j*nnx+k*nnxnny])/tausL+
-        (cs[(nnx-1)+(j+1)*nnx+k*nnxnny]+cs[(nnx-1)+(j-1)*nnx+k*nnxnny])/tausT+
-        (cs[(nnx-1)+j*nnx+(k+1)*nnxnny]+cs[(nnx-1)+j*nnx+(k-1)*nnxnny])/tausT;
-    }
-  }
-  //y fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int i=1;i<(nnx-1);i++)
-  {
-    csmn[i+0*nnx+0*nnxnny]=(cs[i+0*nnx+0*nnxnny+1]+cs[i+0*nnx+0*nnxnny-1])/tausL+
-      (cs[i+(0+1)*nnx+0*nnxnny]+cs[i+(nny-1)*nnx+0*nnxnny])/tausT+
-      (cs[i+0*nnx+(0+1)*nnxnny]+cs[i+0*nnx+(nnz-1)*nnxnny])/tausT;
-    csmn[i+(nny-1)*nnx+0*nnxnny]=(cs[i+(nny-1)*nnx+0*nnxnny+1]+cs[i+(nny-1)*nnx+0*nnxnny-1])/tausL+
-      (cs[i+((nny-1)-1)*nnx+0*nnxnny]+cs[i+(0)*nnx+0*nnxnny])/tausT+
-      (cs[i+(nny-1)*nnx+(0+1)*nnxnny]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
-    csmn[i+0*nnx+(nnz-1)*nnxnny]=(cs[i+0*nnx+(nnz-1)*nnxnny+1]+cs[i+0*nnx+(nnz-1)*nnxnny-1])/tausL+
-      (cs[i+(0+1)*nnx+(nnz-1)*nnxnny]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[i+0*nnx+((nnz-1)-1)*nnxnny]+cs[i+0*nnx+(0)*nnxnny])/tausT;
-    csmn[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny-1])/tausL+
-      (cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[i+(0)*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[i+(nny-1)*nnx+(0)*nnxnny])/tausT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      csmn[i+0*nnx+k*nnxnny]=(cs[i+0*nnx+k*nnxnny+1]+cs[i+0*nnx+k*nnxnny-1])/tausL+
-        (cs[i+(0+1)*nnx+k*nnxnny]+cs[i+(nny-1)*nnx+k*nnxnny])/tausT+
-        (cs[i+0*nnx+(k+1)*nnxnny]+cs[i+0*nnx+(k-1)*nnxnny])/tausT;
-      csmn[i+(nny-1)*nnx+k*nnxnny]=(cs[i+(nny-1)*nnx+k*nnxnny+1]+cs[i+(nny-1)*nnx+k*nnxnny-1])/tausL+
-        (cs[i+((nny-1)-1)*nnx+k*nnxnny]+cs[i+(0)*nnx+k*nnxnny])/tausT+
-        (cs[i+(nny-1)*nnx+(k+1)*nnxnny]+cs[i+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
-    }
-    //z fixed
-#pragma ivdep
-#pragma vector always
+  #ifdef ___PERIODIC
+    csmn[0+0*nnx+0*nnxnny]=(cs[0+0*nnx+0*nnxnny+1]+cs[(nnx-1)+0*nnx+0*nnxnny])/tausL+
+      (cs[0+(0+1)*nnx+0*nnxnny]+cs[0+(nny-1)*nnx+0*nnxnny])/tausT+
+      (cs[0+0*nnx+(0+1)*nnxnny]+cs[0+0*nnx+(nnz-1)*nnxnny])/tausT;
+    csmn[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[0+(0)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[0+(nny-1)*nnx+(0)*nnxnny])/tausT;
+    csmn[0+(nny-1)*nnx+0*nnxnny]=(cs[0+(nny-1)*nnx+0*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausL+
+      (cs[0+((nny-1)-1)*nnx+0*nnxnny]+cs[0+(0)*nnx+0*nnxnny])/tausT+
+      (cs[0+(nny-1)*nnx+(0+1)*nnxnny]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
+    csmn[0+0*nnx+(nnz-1)*nnxnny]=(cs[0+0*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[0+(0+1)*nnx+(nnz-1)*nnxnny]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[0+0*nnx+((nnz-1)-1)*nnxnny]+cs[0+0*nnx+(0)*nnxnny])/tausT;
+    csmn[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cs[(0)+(nny-1)*nnx+0*nnxnny])/tausL+
+      (cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cs[(nnx-1)+(0)*nnx+0*nnxnny])/tausT+
+      (cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
+    csmn[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cs[(0)+0*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+0*nnx+(0)*nnxnny])/tausT;
+    csmn[(nnx-1)+0*nnx+0*nnxnny]=(cs[(nnx-1)+0*nnx+0*nnxnny-1]+cs[(0)+0*nnx+0*nnxnny])/tausL+
+      (cs[(nnx-1)+(0+1)*nnx+0*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausT+
+      (cs[(nnx-1)+0*nnx+(0+1)*nnxnny]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausT;
+    csmn[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cs[(0)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(0)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(0)*nnxnny])/tausT;
+    //x fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
     for (int j=1;j<nny-1;j++)
     {
-      csmn[i+j*nnx+0*nnxnny]=(cs[i+j*nnx+0*nnxnny+1]+cs[i+j*nnx+0*nnxnny-1])/tausL+
-        (cs[i+(j+1)*nnx+0*nnxnny]+cs[i+(j-1)*nnx+0*nnxnny])/tausT+
-        (cs[i+j*nnx+(0+1)*nnxnny]+cs[i+j*nnx+(nnz-1)*nnxnny])/tausT;
-      csmn[i+j*nnx+(nnz-1)*nnxnny]=(cs[i+j*nnx+(nnz-1)*nnxnny+1]+cs[i+j*nnx+(nnz-1)*nnxnny-1])/tausL+
-        (cs[i+(j+1)*nnx+(nnz-1)*nnxnny]+cs[i+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
-        (cs[i+j*nnx+((nnz-1)-1)*nnxnny]+cs[i+j*nnx+(0)*nnxnny])/tausT;
-    }
-  }
-#pragma ivdep
-#pragma vector always
-  for (int k=1;k<nnz-1;k++)
-  {
-    csmn[0+0*nnx+k*nnxnny]=(cs[0+0*nnx+k*nnxnny+1]+cs[(nnx-1)+0*nnx+k*nnxnny])/tausL+
-      (cs[0+(0+1)*nnx+k*nnxnny]+cs[0+(nny-1)*nnx+k*nnxnny])/tausT+
-      (cs[0+0*nnx+(k+1)*nnxnny]+cs[0+0*nnx+(k-1)*nnxnny])/tausT;
-    csmn[0+(nny-1)*nnx+k*nnxnny]=(cs[0+(nny-1)*nnx+k*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausL+
-      (cs[0+((nny-1)-1)*nnx+k*nnxnny]+cs[0+(0)*nnx+k*nnxnny])/tausT+
-      (cs[0+(nny-1)*nnx+(k+1)*nnxnny]+cs[0+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
-    csmn[(nnx-1)+0*nnx+k*nnxnny]=(cs[(nnx-1)+0*nnx+k*nnxnny-1]+cs[(0)+0*nnx+k*nnxnny])/tausL+
-      (cs[(nnx-1)+(0+1)*nnx+k*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausT+
-      (cs[(nnx-1)+0*nnx+(k+1)*nnxnny]+cs[(nnx-1)+0*nnx+(k-1)*nnxnny])/tausT;
-    csmn[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cs[0+(nny-1)*nnx+k*nnxnny])/tausL+
-      (cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cs[(nnx-1)+(0)*nnx+k*nnxnny])/tausT+
-      (cs[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
-  }
-#else
-  csmn[0+0*nnx+0*nnxnny]=(cs[0+0*nnx+0*nnxnny+1]+cs[0+0*nnx+0*nnxnny+1])/tausL+
-    (cs[0+(0+1)*nnx+0*nnxnny]+cs[0+(0+1)*nnx+0*nnxnny])/tausT+
-    (cs[0+0*nnx+(0+1)*nnxnny]+cs[0+0*nnx+(0+1)*nnxnny])/tausT;
-  csmn[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1])/tausL+
-    (cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny])/tausT;
-  csmn[0+(nny-1)*nnx+0*nnxnny]=(cs[0+(nny-1)*nnx+0*nnxnny+1]+cs[0+(nny-1)*nnx+0*nnxnny+1])/tausL+
-    (cs[0+((nny-1)-1)*nnx+0*nnxnny]+cs[0+((nny-1)-1)*nnx+0*nnxnny])/tausT+
-    (cs[0+(nny-1)*nnx+(0+1)*nnxnny]+cs[0+(nny-1)*nnx+(0+1)*nnxnny])/tausT;
-  csmn[0+0*nnx+(nnz-1)*nnxnny]=(cs[0+0*nnx+(nnz-1)*nnxnny+1]+cs[0+0*nnx+(nnz-1)*nnxnny+1])/tausL+
-    (cs[0+(0+1)*nnx+(nnz-1)*nnxnny]+cs[0+(0+1)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[0+0*nnx+((nnz-1)-1)*nnxnny]+cs[0+0*nnx+((nnz-1)-1)*nnxnny])/tausT;
-  csmn[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1])/tausL+
-    (cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny])/tausT+
-    (cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny])/tausT;
-  csmn[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1])/tausL+
-    (cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny])/tausT;
-  csmn[(nnx-1)+0*nnx+0*nnxnny]=(cs[(nnx-1)+0*nnx+0*nnxnny-1]+cs[(nnx-1)+0*nnx+0*nnxnny-1])/tausL+
-    (cs[(nnx-1)+(0+1)*nnx+0*nnxnny]+cs[(nnx-1)+(0+1)*nnx+0*nnxnny])/tausT+
-    (cs[(nnx-1)+0*nnx+(0+1)*nnxnny]+cs[(nnx-1)+0*nnx+(0+1)*nnxnny])/tausT;
-  csmn[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1])/tausL+
-    (cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny])/tausT;
-  //x fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int j=1;j<nny-1;j++)
-  {
-    csmn[0+j*nnx+0*nnxnny]=(cs[0+j*nnx+0*nnxnny+1]+cs[0+j*nnx+0*nnxnny+1])/tausL+
-      (cs[0+(j+1)*nnx+0*nnxnny]+cs[0+(j-1)*nnx+0*nnxnny])/tausT+
-      (cs[0+j*nnx+(0+1)*nnxnny]+cs[0+j*nnx+(0+1)*nnxnny])/tausT;
-    csmn[(nnx-1)+j*nnx+0*nnxnny]=(cs[(nnx-1)+j*nnx+0*nnxnny-1]+cs[(nnx-1)+j*nnx+0*nnxnny-1])/tausL+
-      (cs[(nnx-1)+(j+1)*nnx+0*nnxnny]+cs[(nnx-1)+(j-1)*nnx+0*nnxnny])/tausT+
-      (cs[(nnx-1)+j*nnx+(0+1)*nnxnny]+cs[(nnx-1)+j*nnx+(0+1)*nnxnny])/tausT;
-    csmn[0+j*nnx+(nnz-1)*nnxnny]=(cs[0+j*nnx+(nnz-1)*nnxnny+1]+cs[0+j*nnx+(nnz-1)*nnxnny+1])/tausL+
-      (cs[0+(j+1)*nnx+(nnz-1)*nnxnny]+cs[0+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[0+j*nnx+((nnz-1)-1)*nnxnny]+cs[0+j*nnx+((nnz-1)-1)*nnxnny])/tausT;
-    csmn[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1])/tausL+
-      (cs[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny])/tausT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      csmn[0+j*nnx+k*nnxnny]=(cs[0+j*nnx+k*nnxnny+1]+cs[0+j*nnx+k*nnxnny+1])/tausL+
-        (cs[0+(j+1)*nnx+k*nnxnny]+cs[0+(j-1)*nnx+k*nnxnny])/tausT+
-        (cs[0+j*nnx+(k+1)*nnxnny]+cs[0+j*nnx+(k-1)*nnxnny])/tausT;
-      csmn[(nnx-1)+j*nnx+k*nnxnny]=(cs[(nnx-1)+j*nnx+k*nnxnny-1]+cs[(nnx-1)+j*nnx+k*nnxnny-1])/tausL+
-        (cs[(nnx-1)+(j+1)*nnx+k*nnxnny]+cs[(nnx-1)+(j-1)*nnx+k*nnxnny])/tausT+
-        (cs[(nnx-1)+j*nnx+(k+1)*nnxnny]+cs[(nnx-1)+j*nnx+(k-1)*nnxnny])/tausT;
-    }
-  }
-  //y fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int i=1;i<(nnx-1);i++)
-  {
-    csmn[i+0*nnx+0*nnxnny]=(cs[i+0*nnx+0*nnxnny+1]+cs[i+0*nnx+0*nnxnny-1])/tausL+
-      (cs[i+(0+1)*nnx+0*nnxnny]+cs[i+(0+1)*nnx+0*nnxnny])/tausT+
-      (cs[i+0*nnx+(0+1)*nnxnny]+cs[i+0*nnx+(0+1)*nnxnny])/tausT;
-    csmn[i+(nny-1)*nnx+0*nnxnny]=(cs[i+(nny-1)*nnx+0*nnxnny+1]+cs[i+(nny-1)*nnx+0*nnxnny-1])/tausL+
-      (cs[i+((nny-1)-1)*nnx+0*nnxnny]+cs[i+((nny-1)-1)*nnx+0*nnxnny])/tausT+
-      (cs[i+(nny-1)*nnx+(0+1)*nnxnny]+cs[i+(nny-1)*nnx+(0+1)*nnxnny])/tausT;
-    csmn[i+0*nnx+(nnz-1)*nnxnny]=(cs[i+0*nnx+(nnz-1)*nnxnny+1]+cs[i+0*nnx+(nnz-1)*nnxnny-1])/tausL+
-      (cs[i+(0+1)*nnx+(nnz-1)*nnxnny]+cs[i+(0+1)*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[i+0*nnx+((nnz-1)-1)*nnxnny]+cs[i+0*nnx+((nnz-1)-1)*nnxnny])/tausT;
-    csmn[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny-1])/tausL+
-      (cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny])/tausT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      csmn[i+0*nnx+k*nnxnny]=(cs[i+0*nnx+k*nnxnny+1]+cs[i+0*nnx+k*nnxnny-1])/tausL+
-        (cs[i+(0+1)*nnx+k*nnxnny]+cs[i+(0+1)*nnx+k*nnxnny])/tausT+
-        (cs[i+0*nnx+(k+1)*nnxnny]+cs[i+0*nnx+(k-1)*nnxnny])/tausT;
-      csmn[i+(nny-1)*nnx+k*nnxnny]=(cs[i+(nny-1)*nnx+k*nnxnny+1]+cs[i+(nny-1)*nnx+k*nnxnny-1])/tausL+
-        (cs[i+((nny-1)-1)*nnx+k*nnxnny]+cs[i+((nny-1)-1)*nnx+k*nnxnny])/tausT+
-        (cs[i+(nny-1)*nnx+(k+1)*nnxnny]+cs[i+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
-    }
-    //z fixed
-#pragma ivdep
-#pragma vector always
-    for (int j=1;j<nny-1;j++)
-    {
-      csmn[i+j*nnx+0*nnxnny]=(cs[i+j*nnx+0*nnxnny+1]+cs[i+j*nnx+0*nnxnny-1])/tausL+
-        (cs[i+(j+1)*nnx+0*nnxnny]+cs[i+(j-1)*nnx+0*nnxnny])/tausT+
-        (cs[i+j*nnx+(0+1)*nnxnny]+cs[i+j*nnx+(0+1)*nnxnny])/tausT;
-      csmn[i+j*nnx+(nnz-1)*nnxnny]=(cs[i+j*nnx+(nnz-1)*nnxnny+1]+cs[i+j*nnx+(nnz-1)*nnxnny-1])/tausL+
-        (cs[i+(j+1)*nnx+(nnz-1)*nnxnny]+cs[i+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
-        (cs[i+j*nnx+((nnz-1)-1)*nnxnny]+cs[i+j*nnx+((nnz-1)-1)*nnxnny])/tausT;
-    }
-  }
-#pragma ivdep
-#pragma vector always
-  for (int k=1;k<nnz-1;k++)
-  {
-    csmn[0+0*nnx+k*nnxnny]=(cs[0+0*nnx+k*nnxnny+1]+cs[0+0*nnx+k*nnxnny+1])/tausL+
-      (cs[0+(0+1)*nnx+k*nnxnny]+cs[0+(0+1)*nnx+k*nnxnny])/tausT+
-      (cs[0+0*nnx+(k+1)*nnxnny]+cs[0+0*nnx+(k-1)*nnxnny])/tausT;
-    csmn[0+(nny-1)*nnx+k*nnxnny]=(cs[0+(nny-1)*nnx+k*nnxnny+1]+cs[0+(nny-1)*nnx+k*nnxnny+1])/tausL+
-      (cs[0+((nny-1)-1)*nnx+k*nnxnny]+cs[0+((nny-1)-1)*nnx+k*nnxnny])/tausT+
-      (cs[0+(nny-1)*nnx+(k+1)*nnxnny]+cs[0+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
-    csmn[(nnx-1)+0*nnx+k*nnxnny]=(cs[(nnx-1)+0*nnx+k*nnxnny-1]+cs[(nnx-1)+0*nnx+k*nnxnny-1])/tausL+
-      (cs[(nnx-1)+(0+1)*nnx+k*nnxnny]+cs[(nnx-1)+(0+1)*nnx+k*nnxnny])/tausT+
-      (cs[(nnx-1)+0*nnx+(k+1)*nnxnny]+cs[(nnx-1)+0*nnx+(k-1)*nnxnny])/tausT;
-    csmn[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1])/tausL+
-      (cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny])/tausT+
-      (cs[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
-  }
-#endif
-
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int k=1;k<nnz-1;k++)
-  {
-    for (int j=1;j<nny-1;j++)
-    {
-#pragma ivdep
-#pragma vector always
-      for (int i=1;i<nnx-1;i++)
+      csmn[0+j*nnx+0*nnxnny]=(cs[0+j*nnx+0*nnxnny+1]+cs[(nnx-1)+j*nnx+0*nnxnny])/tausL+
+        (cs[0+(j+1)*nnx+0*nnxnny]+cs[0+(j-1)*nnx+0*nnxnny])/tausT+
+        (cs[0+j*nnx+(0+1)*nnxnny]+cs[0+j*nnx+(nnz-1)*nnxnny])/tausT;
+      csmn[(nnx-1)+j*nnx+0*nnxnny]=(cs[(nnx-1)+j*nnx+0*nnxnny-1]+cs[(0)+j*nnx+0*nnxnny])/tausL+
+        (cs[(nnx-1)+(j+1)*nnx+0*nnxnny]+cs[(nnx-1)+(j-1)*nnx+0*nnxnny])/tausT+
+        (cs[(nnx-1)+j*nnx+(0+1)*nnxnny]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausT;
+      csmn[0+j*nnx+(nnz-1)*nnxnny]=(cs[0+j*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausL+
+        (cs[0+(j+1)*nnx+(nnz-1)*nnxnny]+cs[0+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[0+j*nnx+((nnz-1)-1)*nnxnny]+cs[0+j*nnx+(0)*nnxnny])/tausT;
+      csmn[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cs[(0)+j*nnx+(nnz-1)*nnxnny])/tausL+
+        (cs[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+j*nnx+(0)*nnxnny])/tausT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
       {
-        csmn[i+j*nnx+k*nnxnny]=(cs[i+j*nnx+k*nnxnny+1]+cs[i+j*nnx+k*nnxnny-1])/tausL+
-          (cs[i+(j+1)*nnx+k*nnxnny]+cs[i+(j-1)*nnx+k*nnxnny])/tausT+
-          (cs[i+j*nnx+(k+1)*nnxnny]+cs[i+j*nnx+(k-1)*nnxnny])/tausT;
+        csmn[0+j*nnx+k*nnxnny]=(cs[0+j*nnx+k*nnxnny+1]+cs[(nnx-1)+j*nnx+k*nnxnny])/tausL+
+          (cs[0+(j+1)*nnx+k*nnxnny]+cs[0+(j-1)*nnx+k*nnxnny])/tausT+
+          (cs[0+j*nnx+(k+1)*nnxnny]+cs[0+j*nnx+(k-1)*nnxnny])/tausT;
+        csmn[(nnx-1)+j*nnx+k*nnxnny]=(cs[(nnx-1)+j*nnx+k*nnxnny-1]+cs[(0)+j*nnx+k*nnxnny])/tausL+
+          (cs[(nnx-1)+(j+1)*nnx+k*nnxnny]+cs[(nnx-1)+(j-1)*nnx+k*nnxnny])/tausT+
+          (cs[(nnx-1)+j*nnx+(k+1)*nnxnny]+cs[(nnx-1)+j*nnx+(k-1)*nnxnny])/tausT;
       }
     }
-  }
+    //y fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int i=1;i<(nnx-1);i++)
+    {
+      csmn[i+0*nnx+0*nnxnny]=(cs[i+0*nnx+0*nnxnny+1]+cs[i+0*nnx+0*nnxnny-1])/tausL+
+        (cs[i+(0+1)*nnx+0*nnxnny]+cs[i+(nny-1)*nnx+0*nnxnny])/tausT+
+        (cs[i+0*nnx+(0+1)*nnxnny]+cs[i+0*nnx+(nnz-1)*nnxnny])/tausT;
+      csmn[i+(nny-1)*nnx+0*nnxnny]=(cs[i+(nny-1)*nnx+0*nnxnny+1]+cs[i+(nny-1)*nnx+0*nnxnny-1])/tausL+
+        (cs[i+((nny-1)-1)*nnx+0*nnxnny]+cs[i+(0)*nnx+0*nnxnny])/tausT+
+        (cs[i+(nny-1)*nnx+(0+1)*nnxnny]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
+      csmn[i+0*nnx+(nnz-1)*nnxnny]=(cs[i+0*nnx+(nnz-1)*nnxnny+1]+cs[i+0*nnx+(nnz-1)*nnxnny-1])/tausL+
+        (cs[i+(0+1)*nnx+(nnz-1)*nnxnny]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[i+0*nnx+((nnz-1)-1)*nnxnny]+cs[i+0*nnx+(0)*nnxnny])/tausT;
+      csmn[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny-1])/tausL+
+        (cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[i+(0)*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[i+(nny-1)*nnx+(0)*nnxnny])/tausT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        csmn[i+0*nnx+k*nnxnny]=(cs[i+0*nnx+k*nnxnny+1]+cs[i+0*nnx+k*nnxnny-1])/tausL+
+          (cs[i+(0+1)*nnx+k*nnxnny]+cs[i+(nny-1)*nnx+k*nnxnny])/tausT+
+          (cs[i+0*nnx+(k+1)*nnxnny]+cs[i+0*nnx+(k-1)*nnxnny])/tausT;
+        csmn[i+(nny-1)*nnx+k*nnxnny]=(cs[i+(nny-1)*nnx+k*nnxnny+1]+cs[i+(nny-1)*nnx+k*nnxnny-1])/tausL+
+          (cs[i+((nny-1)-1)*nnx+k*nnxnny]+cs[i+(0)*nnx+k*nnxnny])/tausT+
+          (cs[i+(nny-1)*nnx+(k+1)*nnxnny]+cs[i+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
+      }
+      //z fixed
+  #pragma ivdep
+  #pragma vector always
+      for (int j=1;j<nny-1;j++)
+      {
+        csmn[i+j*nnx+0*nnxnny]=(cs[i+j*nnx+0*nnxnny+1]+cs[i+j*nnx+0*nnxnny-1])/tausL+
+          (cs[i+(j+1)*nnx+0*nnxnny]+cs[i+(j-1)*nnx+0*nnxnny])/tausT+
+          (cs[i+j*nnx+(0+1)*nnxnny]+cs[i+j*nnx+(nnz-1)*nnxnny])/tausT;
+        csmn[i+j*nnx+(nnz-1)*nnxnny]=(cs[i+j*nnx+(nnz-1)*nnxnny+1]+cs[i+j*nnx+(nnz-1)*nnxnny-1])/tausL+
+          (cs[i+(j+1)*nnx+(nnz-1)*nnxnny]+cs[i+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
+          (cs[i+j*nnx+((nnz-1)-1)*nnxnny]+cs[i+j*nnx+(0)*nnxnny])/tausT;
+      }
+    }
+  #pragma ivdep
+  #pragma vector always
+    for (int k=1;k<nnz-1;k++)
+    {
+      csmn[0+0*nnx+k*nnxnny]=(cs[0+0*nnx+k*nnxnny+1]+cs[(nnx-1)+0*nnx+k*nnxnny])/tausL+
+        (cs[0+(0+1)*nnx+k*nnxnny]+cs[0+(nny-1)*nnx+k*nnxnny])/tausT+
+        (cs[0+0*nnx+(k+1)*nnxnny]+cs[0+0*nnx+(k-1)*nnxnny])/tausT;
+      csmn[0+(nny-1)*nnx+k*nnxnny]=(cs[0+(nny-1)*nnx+k*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausL+
+        (cs[0+((nny-1)-1)*nnx+k*nnxnny]+cs[0+(0)*nnx+k*nnxnny])/tausT+
+        (cs[0+(nny-1)*nnx+(k+1)*nnxnny]+cs[0+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
+      csmn[(nnx-1)+0*nnx+k*nnxnny]=(cs[(nnx-1)+0*nnx+k*nnxnny-1]+cs[(0)+0*nnx+k*nnxnny])/tausL+
+        (cs[(nnx-1)+(0+1)*nnx+k*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausT+
+        (cs[(nnx-1)+0*nnx+(k+1)*nnxnny]+cs[(nnx-1)+0*nnx+(k-1)*nnxnny])/tausT;
+      csmn[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cs[0+(nny-1)*nnx+k*nnxnny])/tausL+
+        (cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cs[(nnx-1)+(0)*nnx+k*nnxnny])/tausT+
+        (cs[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
+    }
+  #else
+    csmn[0+0*nnx+0*nnxnny]=(cs[0+0*nnx+0*nnxnny+1]+cs[0+0*nnx+0*nnxnny+1])/tausL+
+      (cs[0+(0+1)*nnx+0*nnxnny]+cs[0+(0+1)*nnx+0*nnxnny])/tausT+
+      (cs[0+0*nnx+(0+1)*nnxnny]+cs[0+0*nnx+(0+1)*nnxnny])/tausT;
+    csmn[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1])/tausL+
+      (cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny])/tausT;
+    csmn[0+(nny-1)*nnx+0*nnxnny]=(cs[0+(nny-1)*nnx+0*nnxnny+1]+cs[0+(nny-1)*nnx+0*nnxnny+1])/tausL+
+      (cs[0+((nny-1)-1)*nnx+0*nnxnny]+cs[0+((nny-1)-1)*nnx+0*nnxnny])/tausT+
+      (cs[0+(nny-1)*nnx+(0+1)*nnxnny]+cs[0+(nny-1)*nnx+(0+1)*nnxnny])/tausT;
+    csmn[0+0*nnx+(nnz-1)*nnxnny]=(cs[0+0*nnx+(nnz-1)*nnxnny+1]+cs[0+0*nnx+(nnz-1)*nnxnny+1])/tausL+
+      (cs[0+(0+1)*nnx+(nnz-1)*nnxnny]+cs[0+(0+1)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[0+0*nnx+((nnz-1)-1)*nnxnny]+cs[0+0*nnx+((nnz-1)-1)*nnxnny])/tausT;
+    csmn[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1])/tausL+
+      (cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny])/tausT+
+      (cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny])/tausT;
+    csmn[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1])/tausL+
+      (cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny])/tausT;
+    csmn[(nnx-1)+0*nnx+0*nnxnny]=(cs[(nnx-1)+0*nnx+0*nnxnny-1]+cs[(nnx-1)+0*nnx+0*nnxnny-1])/tausL+
+      (cs[(nnx-1)+(0+1)*nnx+0*nnxnny]+cs[(nnx-1)+(0+1)*nnx+0*nnxnny])/tausT+
+      (cs[(nnx-1)+0*nnx+(0+1)*nnxnny]+cs[(nnx-1)+0*nnx+(0+1)*nnxnny])/tausT;
+    csmn[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1])/tausL+
+      (cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny])/tausT;
+    //x fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int j=1;j<nny-1;j++)
+    {
+      csmn[0+j*nnx+0*nnxnny]=(cs[0+j*nnx+0*nnxnny+1]+cs[0+j*nnx+0*nnxnny+1])/tausL+
+        (cs[0+(j+1)*nnx+0*nnxnny]+cs[0+(j-1)*nnx+0*nnxnny])/tausT+
+        (cs[0+j*nnx+(0+1)*nnxnny]+cs[0+j*nnx+(0+1)*nnxnny])/tausT;
+      csmn[(nnx-1)+j*nnx+0*nnxnny]=(cs[(nnx-1)+j*nnx+0*nnxnny-1]+cs[(nnx-1)+j*nnx+0*nnxnny-1])/tausL+
+        (cs[(nnx-1)+(j+1)*nnx+0*nnxnny]+cs[(nnx-1)+(j-1)*nnx+0*nnxnny])/tausT+
+        (cs[(nnx-1)+j*nnx+(0+1)*nnxnny]+cs[(nnx-1)+j*nnx+(0+1)*nnxnny])/tausT;
+      csmn[0+j*nnx+(nnz-1)*nnxnny]=(cs[0+j*nnx+(nnz-1)*nnxnny+1]+cs[0+j*nnx+(nnz-1)*nnxnny+1])/tausL+
+        (cs[0+(j+1)*nnx+(nnz-1)*nnxnny]+cs[0+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[0+j*nnx+((nnz-1)-1)*nnxnny]+cs[0+j*nnx+((nnz-1)-1)*nnxnny])/tausT;
+      csmn[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1])/tausL+
+        (cs[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny])/tausT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        csmn[0+j*nnx+k*nnxnny]=(cs[0+j*nnx+k*nnxnny+1]+cs[0+j*nnx+k*nnxnny+1])/tausL+
+          (cs[0+(j+1)*nnx+k*nnxnny]+cs[0+(j-1)*nnx+k*nnxnny])/tausT+
+          (cs[0+j*nnx+(k+1)*nnxnny]+cs[0+j*nnx+(k-1)*nnxnny])/tausT;
+        csmn[(nnx-1)+j*nnx+k*nnxnny]=(cs[(nnx-1)+j*nnx+k*nnxnny-1]+cs[(nnx-1)+j*nnx+k*nnxnny-1])/tausL+
+          (cs[(nnx-1)+(j+1)*nnx+k*nnxnny]+cs[(nnx-1)+(j-1)*nnx+k*nnxnny])/tausT+
+          (cs[(nnx-1)+j*nnx+(k+1)*nnxnny]+cs[(nnx-1)+j*nnx+(k-1)*nnxnny])/tausT;
+      }
+    }
+    //y fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int i=1;i<(nnx-1);i++)
+    {
+      csmn[i+0*nnx+0*nnxnny]=(cs[i+0*nnx+0*nnxnny+1]+cs[i+0*nnx+0*nnxnny-1])/tausL+
+        (cs[i+(0+1)*nnx+0*nnxnny]+cs[i+(0+1)*nnx+0*nnxnny])/tausT+
+        (cs[i+0*nnx+(0+1)*nnxnny]+cs[i+0*nnx+(0+1)*nnxnny])/tausT;
+      csmn[i+(nny-1)*nnx+0*nnxnny]=(cs[i+(nny-1)*nnx+0*nnxnny+1]+cs[i+(nny-1)*nnx+0*nnxnny-1])/tausL+
+        (cs[i+((nny-1)-1)*nnx+0*nnxnny]+cs[i+((nny-1)-1)*nnx+0*nnxnny])/tausT+
+        (cs[i+(nny-1)*nnx+(0+1)*nnxnny]+cs[i+(nny-1)*nnx+(0+1)*nnxnny])/tausT;
+      csmn[i+0*nnx+(nnz-1)*nnxnny]=(cs[i+0*nnx+(nnz-1)*nnxnny+1]+cs[i+0*nnx+(nnz-1)*nnxnny-1])/tausL+
+        (cs[i+(0+1)*nnx+(nnz-1)*nnxnny]+cs[i+(0+1)*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[i+0*nnx+((nnz-1)-1)*nnxnny]+cs[i+0*nnx+((nnz-1)-1)*nnxnny])/tausT;
+      csmn[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny-1])/tausL+
+        (cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny])/tausT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        csmn[i+0*nnx+k*nnxnny]=(cs[i+0*nnx+k*nnxnny+1]+cs[i+0*nnx+k*nnxnny-1])/tausL+
+          (cs[i+(0+1)*nnx+k*nnxnny]+cs[i+(0+1)*nnx+k*nnxnny])/tausT+
+          (cs[i+0*nnx+(k+1)*nnxnny]+cs[i+0*nnx+(k-1)*nnxnny])/tausT;
+        csmn[i+(nny-1)*nnx+k*nnxnny]=(cs[i+(nny-1)*nnx+k*nnxnny+1]+cs[i+(nny-1)*nnx+k*nnxnny-1])/tausL+
+          (cs[i+((nny-1)-1)*nnx+k*nnxnny]+cs[i+((nny-1)-1)*nnx+k*nnxnny])/tausT+
+          (cs[i+(nny-1)*nnx+(k+1)*nnxnny]+cs[i+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
+      }
+      //z fixed
+  #pragma ivdep
+  #pragma vector always
+      for (int j=1;j<nny-1;j++)
+      {
+        csmn[i+j*nnx+0*nnxnny]=(cs[i+j*nnx+0*nnxnny+1]+cs[i+j*nnx+0*nnxnny-1])/tausL+
+          (cs[i+(j+1)*nnx+0*nnxnny]+cs[i+(j-1)*nnx+0*nnxnny])/tausT+
+          (cs[i+j*nnx+(0+1)*nnxnny]+cs[i+j*nnx+(0+1)*nnxnny])/tausT;
+        csmn[i+j*nnx+(nnz-1)*nnxnny]=(cs[i+j*nnx+(nnz-1)*nnxnny+1]+cs[i+j*nnx+(nnz-1)*nnxnny-1])/tausL+
+          (cs[i+(j+1)*nnx+(nnz-1)*nnxnny]+cs[i+(j-1)*nnx+(nnz-1)*nnxnny])/tausT+
+          (cs[i+j*nnx+((nnz-1)-1)*nnxnny]+cs[i+j*nnx+((nnz-1)-1)*nnxnny])/tausT;
+      }
+    }
+  #pragma ivdep
+  #pragma vector always
+    for (int k=1;k<nnz-1;k++)
+    {
+      csmn[0+0*nnx+k*nnxnny]=(cs[0+0*nnx+k*nnxnny+1]+cs[0+0*nnx+k*nnxnny+1])/tausL+
+        (cs[0+(0+1)*nnx+k*nnxnny]+cs[0+(0+1)*nnx+k*nnxnny])/tausT+
+        (cs[0+0*nnx+(k+1)*nnxnny]+cs[0+0*nnx+(k-1)*nnxnny])/tausT;
+      csmn[0+(nny-1)*nnx+k*nnxnny]=(cs[0+(nny-1)*nnx+k*nnxnny+1]+cs[0+(nny-1)*nnx+k*nnxnny+1])/tausL+
+        (cs[0+((nny-1)-1)*nnx+k*nnxnny]+cs[0+((nny-1)-1)*nnx+k*nnxnny])/tausT+
+        (cs[0+(nny-1)*nnx+(k+1)*nnxnny]+cs[0+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
+      csmn[(nnx-1)+0*nnx+k*nnxnny]=(cs[(nnx-1)+0*nnx+k*nnxnny-1]+cs[(nnx-1)+0*nnx+k*nnxnny-1])/tausL+
+        (cs[(nnx-1)+(0+1)*nnx+k*nnxnny]+cs[(nnx-1)+(0+1)*nnx+k*nnxnny])/tausT+
+        (cs[(nnx-1)+0*nnx+(k+1)*nnxnny]+cs[(nnx-1)+0*nnx+(k-1)*nnxnny])/tausT;
+      csmn[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1])/tausL+
+        (cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny])/tausT+
+        (cs[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny])/tausT;
+    }
+  #endif
+
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int k=1;k<nnz-1;k++)
+    {
+      for (int j=1;j<nny-1;j++)
+      {
+  #pragma ivdep
+  #pragma vector always
+        for (int i=1;i<nnx-1;i++)
+        {
+          csmn[i+j*nnx+k*nnxnny]=(cs[i+j*nnx+k*nnxnny+1]+cs[i+j*nnx+k*nnxnny-1])/tausL+
+            (cs[i+(j+1)*nnx+k*nnxnny]+cs[i+(j-1)*nnx+k*nnxnny])/tausT+
+            (cs[i+j*nnx+(k+1)*nnxnny]+cs[i+j*nnx+(k-1)*nnxnny])/tausT;
+        }
+      }
+    }
 }
 #else
 void CSubcell::computeIcs(void)
 {
 
-#ifdef ___PERIODIC
-  Ics[0+0*nnx+0*nnxnny]=(cs[0+0*nnx+0*nnxnny+1]+cs[(nnx-1)+0*nnx+0*nnxnny]-2*cs[0+0*nnx+0*nnxnny])/tausL+
-    (cs[0+(0+1)*nnx+0*nnxnny]+cs[0+(nny-1)*nnx+0*nnxnny]-2*cs[0+0*nnx+0*nnxnny])/tausT+
-    (cs[0+0*nnx+(0+1)*nnxnny]+cs[0+0*nnx+(nnz-1)*nnxnny]-2*cs[0+0*nnx+0*nnxnny])/tausT;
-  Ics[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[0+(0)*nnx+(nnz-1)*nnxnny]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[0+(nny-1)*nnx+(0)*nnxnny]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
-  Ics[0+(nny-1)*nnx+0*nnxnny]=(cs[0+(nny-1)*nnx+0*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausL+
-    (cs[0+((nny-1)-1)*nnx+0*nnxnny]+cs[0+(0)*nnx+0*nnxnny]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausT+
-    (cs[0+(nny-1)*nnx+(0+1)*nnxnny]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausT;
-  Ics[0+0*nnx+(nnz-1)*nnxnny]=(cs[0+0*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[0+(0+1)*nnx+(nnz-1)*nnxnny]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[0+0*nnx+((nnz-1)-1)*nnxnny]+cs[0+0*nnx+(0)*nnxnny]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausT;
-  Ics[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cs[(0)+(nny-1)*nnx+0*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausL+
-    (cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cs[(nnx-1)+(0)*nnx+0*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausT+
-    (cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausT;
-  Ics[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cs[(0)+0*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+0*nnx+(0)*nnxnny]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausT;
-  Ics[(nnx-1)+0*nnx+0*nnxnny]=(cs[(nnx-1)+0*nnx+0*nnxnny-1]+cs[(0)+0*nnx+0*nnxnny]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausL+
-    (cs[(nnx-1)+(0+1)*nnx+0*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausT+
-    (cs[(nnx-1)+0*nnx+(0+1)*nnxnny]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausT;
-  Ics[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cs[(0)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(0)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(0)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
-  //x fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int j=1;j<nny-1;j++)
-  {
-    Ics[0+j*nnx+0*nnxnny]=(cs[0+j*nnx+0*nnxnny+1]+cs[(nnx-1)+j*nnx+0*nnxnny]-2*cs[0+j*nnx+0*nnxnny])/tausL+
-      (cs[0+(j+1)*nnx+0*nnxnny]+cs[0+(j-1)*nnx+0*nnxnny]-2*cs[0+j*nnx+0*nnxnny])/tausT+
-      (cs[0+j*nnx+(0+1)*nnxnny]+cs[0+j*nnx+(nnz-1)*nnxnny]-2*cs[0+j*nnx+0*nnxnny])/tausT;
-    Ics[(nnx-1)+j*nnx+0*nnxnny]=(cs[(nnx-1)+j*nnx+0*nnxnny-1]+cs[(0)+j*nnx+0*nnxnny]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausL+
-      (cs[(nnx-1)+(j+1)*nnx+0*nnxnny]+cs[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausT+
-      (cs[(nnx-1)+j*nnx+(0+1)*nnxnny]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausT;
-    Ics[0+j*nnx+(nnz-1)*nnxnny]=(cs[0+j*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausL+
-      (cs[0+(j+1)*nnx+(nnz-1)*nnxnny]+cs[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[0+j*nnx+((nnz-1)-1)*nnxnny]+cs[0+j*nnx+(0)*nnxnny]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausT;
-    Ics[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cs[(0)+j*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausL+
-      (cs[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+j*nnx+(0)*nnxnny]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Ics[0+j*nnx+k*nnxnny]=(cs[0+j*nnx+k*nnxnny+1]+cs[(nnx-1)+j*nnx+k*nnxnny]-2*cs[0+j*nnx+k*nnxnny])/tausL+
-        (cs[0+(j+1)*nnx+k*nnxnny]+cs[0+(j-1)*nnx+k*nnxnny]-2*cs[0+j*nnx+k*nnxnny])/tausT+
-        (cs[0+j*nnx+(k+1)*nnxnny]+cs[0+j*nnx+(k-1)*nnxnny]-2*cs[0+j*nnx+k*nnxnny])/tausT;
-      Ics[(nnx-1)+j*nnx+k*nnxnny]=(cs[(nnx-1)+j*nnx+k*nnxnny-1]+cs[(0)+j*nnx+k*nnxnny]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausL+
-        (cs[(nnx-1)+(j+1)*nnx+k*nnxnny]+cs[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausT+
-        (cs[(nnx-1)+j*nnx+(k+1)*nnxnny]+cs[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausT;
-    }
-  }
-  //y fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int i=1;i<(nnx-1);i++)
-  {
-    Ics[i+0*nnx+0*nnxnny]=(cs[i+0*nnx+0*nnxnny+1]+cs[i+0*nnx+0*nnxnny-1]-2*cs[i+0*nnx+0*nnxnny])/tausL+
-      (cs[i+(0+1)*nnx+0*nnxnny]+cs[i+(nny-1)*nnx+0*nnxnny]-2*cs[i+0*nnx+0*nnxnny])/tausT+
-      (cs[i+0*nnx+(0+1)*nnxnny]+cs[i+0*nnx+(nnz-1)*nnxnny]-2*cs[i+0*nnx+0*nnxnny])/tausT;
-    Ics[i+(nny-1)*nnx+0*nnxnny]=(cs[i+(nny-1)*nnx+0*nnxnny+1]+cs[i+(nny-1)*nnx+0*nnxnny-1]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausL+
-      (cs[i+((nny-1)-1)*nnx+0*nnxnny]+cs[i+(0)*nnx+0*nnxnny]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausT+
-      (cs[i+(nny-1)*nnx+(0+1)*nnxnny]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausT;
-    Ics[i+0*nnx+(nnz-1)*nnxnny]=(cs[i+0*nnx+(nnz-1)*nnxnny+1]+cs[i+0*nnx+(nnz-1)*nnxnny-1]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausL+
-      (cs[i+(0+1)*nnx+(nnz-1)*nnxnny]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[i+0*nnx+((nnz-1)-1)*nnxnny]+cs[i+0*nnx+(0)*nnxnny]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausT;
-    Ics[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
-      (cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[i+(0)*nnx+(nnz-1)*nnxnny]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[i+(nny-1)*nnx+(0)*nnxnny]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Ics[i+0*nnx+k*nnxnny]=(cs[i+0*nnx+k*nnxnny+1]+cs[i+0*nnx+k*nnxnny-1]-2*cs[i+0*nnx+k*nnxnny])/tausL+
-        (cs[i+(0+1)*nnx+k*nnxnny]+cs[i+(nny-1)*nnx+k*nnxnny]-2*cs[i+0*nnx+k*nnxnny])/tausT+
-        (cs[i+0*nnx+(k+1)*nnxnny]+cs[i+0*nnx+(k-1)*nnxnny]-2*cs[i+0*nnx+k*nnxnny])/tausT;
-      Ics[i+(nny-1)*nnx+k*nnxnny]=(cs[i+(nny-1)*nnx+k*nnxnny+1]+cs[i+(nny-1)*nnx+k*nnxnny-1]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausL+
-        (cs[i+((nny-1)-1)*nnx+k*nnxnny]+cs[i+(0)*nnx+k*nnxnny]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausT+
-        (cs[i+(nny-1)*nnx+(k+1)*nnxnny]+cs[i+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausT;
-    }
-    //z fixed
-#pragma ivdep
-#pragma vector always
+  #ifdef ___PERIODIC
+    Ics[0+0*nnx+0*nnxnny]=(cs[0+0*nnx+0*nnxnny+1]+cs[(nnx-1)+0*nnx+0*nnxnny]-2*cs[0+0*nnx+0*nnxnny])/tausL+
+      (cs[0+(0+1)*nnx+0*nnxnny]+cs[0+(nny-1)*nnx+0*nnxnny]-2*cs[0+0*nnx+0*nnxnny])/tausT+
+      (cs[0+0*nnx+(0+1)*nnxnny]+cs[0+0*nnx+(nnz-1)*nnxnny]-2*cs[0+0*nnx+0*nnxnny])/tausT;
+    Ics[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[0+(0)*nnx+(nnz-1)*nnxnny]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[0+(nny-1)*nnx+(0)*nnxnny]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
+    Ics[0+(nny-1)*nnx+0*nnxnny]=(cs[0+(nny-1)*nnx+0*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausL+
+      (cs[0+((nny-1)-1)*nnx+0*nnxnny]+cs[0+(0)*nnx+0*nnxnny]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausT+
+      (cs[0+(nny-1)*nnx+(0+1)*nnxnny]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausT;
+    Ics[0+0*nnx+(nnz-1)*nnxnny]=(cs[0+0*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[0+(0+1)*nnx+(nnz-1)*nnxnny]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[0+0*nnx+((nnz-1)-1)*nnxnny]+cs[0+0*nnx+(0)*nnxnny]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausT;
+    Ics[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cs[(0)+(nny-1)*nnx+0*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausL+
+      (cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cs[(nnx-1)+(0)*nnx+0*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausT+
+      (cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausT;
+    Ics[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cs[(0)+0*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+0*nnx+(0)*nnxnny]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausT;
+    Ics[(nnx-1)+0*nnx+0*nnxnny]=(cs[(nnx-1)+0*nnx+0*nnxnny-1]+cs[(0)+0*nnx+0*nnxnny]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausL+
+      (cs[(nnx-1)+(0+1)*nnx+0*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausT+
+      (cs[(nnx-1)+0*nnx+(0+1)*nnxnny]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausT;
+    Ics[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cs[(0)+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(0)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(0)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
+    //x fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
     for (int j=1;j<nny-1;j++)
     {
-      Ics[i+j*nnx+0*nnxnny]=(cs[i+j*nnx+0*nnxnny+1]+cs[i+j*nnx+0*nnxnny-1]-2*cs[i+j*nnx+0*nnxnny])/tausL+
-        (cs[i+(j+1)*nnx+0*nnxnny]+cs[i+(j-1)*nnx+0*nnxnny]-2*cs[i+j*nnx+0*nnxnny])/tausT+
-        (cs[i+j*nnx+(0+1)*nnxnny]+cs[i+j*nnx+(nnz-1)*nnxnny]-2*cs[i+j*nnx+0*nnxnny])/tausT;
-      Ics[i+j*nnx+(nnz-1)*nnxnny]=(cs[i+j*nnx+(nnz-1)*nnxnny+1]+cs[i+j*nnx+(nnz-1)*nnxnny-1]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausL+
-        (cs[i+(j+1)*nnx+(nnz-1)*nnxnny]+cs[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausT+
-        (cs[i+j*nnx+((nnz-1)-1)*nnxnny]+cs[i+j*nnx+(0)*nnxnny]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausT;
-    }
-  }
-#pragma ivdep
-#pragma vector always
-  for (int k=1;k<nnz-1;k++)
-  {
-    Ics[0+0*nnx+k*nnxnny]=(cs[0+0*nnx+k*nnxnny+1]+cs[(nnx-1)+0*nnx+k*nnxnny]-2*cs[0+0*nnx+k*nnxnny])/tausL+
-      (cs[0+(0+1)*nnx+k*nnxnny]+cs[0+(nny-1)*nnx+k*nnxnny]-2*cs[0+0*nnx+k*nnxnny])/tausT+
-      (cs[0+0*nnx+(k+1)*nnxnny]+cs[0+0*nnx+(k-1)*nnxnny]-2*cs[0+0*nnx+k*nnxnny])/tausT;
-    Ics[0+(nny-1)*nnx+k*nnxnny]=(cs[0+(nny-1)*nnx+k*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausL+
-      (cs[0+((nny-1)-1)*nnx+k*nnxnny]+cs[0+(0)*nnx+k*nnxnny]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausT+
-      (cs[0+(nny-1)*nnx+(k+1)*nnxnny]+cs[0+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausT;
-    Ics[(nnx-1)+0*nnx+k*nnxnny]=(cs[(nnx-1)+0*nnx+k*nnxnny-1]+cs[(0)+0*nnx+k*nnxnny]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausL+
-      (cs[(nnx-1)+(0+1)*nnx+k*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausT+
-      (cs[(nnx-1)+0*nnx+(k+1)*nnxnny]+cs[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausT;
-    Ics[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cs[(0)+(nny-1)*nnx+k*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausL+
-      (cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cs[(nnx-1)+(0)*nnx+k*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausT+
-      (cs[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausT;
-  }
-#else
-  Ics[0+0*nnx+0*nnxnny]=(cs[0+0*nnx+0*nnxnny+1]+cs[0+0*nnx+0*nnxnny+1]-2*cs[0+0*nnx+0*nnxnny])/tausL+
-    (cs[0+(0+1)*nnx+0*nnxnny]+cs[0+(0+1)*nnx+0*nnxnny]-2*cs[0+0*nnx+0*nnxnny])/tausT+
-    (cs[0+0*nnx+(0+1)*nnxnny]+cs[0+0*nnx+(0+1)*nnxnny]-2*cs[0+0*nnx+0*nnxnny])/tausT;
-  Ics[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
-  Ics[0+(nny-1)*nnx+0*nnxnny]=(cs[0+(nny-1)*nnx+0*nnxnny+1]+cs[0+(nny-1)*nnx+0*nnxnny+1]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausL+
-    (cs[0+((nny-1)-1)*nnx+0*nnxnny]+cs[0+((nny-1)-1)*nnx+0*nnxnny]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausT+
-    (cs[0+(nny-1)*nnx+(0+1)*nnxnny]+cs[0+(nny-1)*nnx+(0+1)*nnxnny]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausT;
-  Ics[0+0*nnx+(nnz-1)*nnxnny]=(cs[0+0*nnx+(nnz-1)*nnxnny+1]+cs[0+0*nnx+(nnz-1)*nnxnny+1]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[0+(0+1)*nnx+(nnz-1)*nnxnny]+cs[0+(0+1)*nnx+(nnz-1)*nnxnny]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[0+0*nnx+((nnz-1)-1)*nnxnny]+cs[0+0*nnx+((nnz-1)-1)*nnxnny]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausT;
-  Ics[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausL+
-    (cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausT+
-    (cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausT;
-  Ics[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausT;
-  Ics[(nnx-1)+0*nnx+0*nnxnny]=(cs[(nnx-1)+0*nnx+0*nnxnny-1]+cs[(nnx-1)+0*nnx+0*nnxnny-1]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausL+
-    (cs[(nnx-1)+(0+1)*nnx+0*nnxnny]+cs[(nnx-1)+(0+1)*nnx+0*nnxnny]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausT+
-    (cs[(nnx-1)+0*nnx+(0+1)*nnxnny]+cs[(nnx-1)+0*nnx+(0+1)*nnxnny]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausT;
-  Ics[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
-    (cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
-    (cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
-  //x fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int j=1;j<nny-1;j++)
-  {
-    Ics[0+j*nnx+0*nnxnny]=(cs[0+j*nnx+0*nnxnny+1]+cs[0+j*nnx+0*nnxnny+1]-2*cs[0+j*nnx+0*nnxnny])/tausL+
-      (cs[0+(j+1)*nnx+0*nnxnny]+cs[0+(j-1)*nnx+0*nnxnny]-2*cs[0+j*nnx+0*nnxnny])/tausT+
-      (cs[0+j*nnx+(0+1)*nnxnny]+cs[0+j*nnx+(0+1)*nnxnny]-2*cs[0+j*nnx+0*nnxnny])/tausT;
-    Ics[(nnx-1)+j*nnx+0*nnxnny]=(cs[(nnx-1)+j*nnx+0*nnxnny-1]+cs[(nnx-1)+j*nnx+0*nnxnny-1]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausL+
-      (cs[(nnx-1)+(j+1)*nnx+0*nnxnny]+cs[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausT+
-      (cs[(nnx-1)+j*nnx+(0+1)*nnxnny]+cs[(nnx-1)+j*nnx+(0+1)*nnxnny]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausT;
-    Ics[0+j*nnx+(nnz-1)*nnxnny]=(cs[0+j*nnx+(nnz-1)*nnxnny+1]+cs[0+j*nnx+(nnz-1)*nnxnny+1]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausL+
-      (cs[0+(j+1)*nnx+(nnz-1)*nnxnny]+cs[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[0+j*nnx+((nnz-1)-1)*nnxnny]+cs[0+j*nnx+((nnz-1)-1)*nnxnny]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausT;
-    Ics[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausL+
-      (cs[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Ics[0+j*nnx+k*nnxnny]=(cs[0+j*nnx+k*nnxnny+1]+cs[0+j*nnx+k*nnxnny+1]-2*cs[0+j*nnx+k*nnxnny])/tausL+
-        (cs[0+(j+1)*nnx+k*nnxnny]+cs[0+(j-1)*nnx+k*nnxnny]-2*cs[0+j*nnx+k*nnxnny])/tausT+
-        (cs[0+j*nnx+(k+1)*nnxnny]+cs[0+j*nnx+(k-1)*nnxnny]-2*cs[0+j*nnx+k*nnxnny])/tausT;
-      Ics[(nnx-1)+j*nnx+k*nnxnny]=(cs[(nnx-1)+j*nnx+k*nnxnny-1]+cs[(nnx-1)+j*nnx+k*nnxnny-1]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausL+
-        (cs[(nnx-1)+(j+1)*nnx+k*nnxnny]+cs[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausT+
-        (cs[(nnx-1)+j*nnx+(k+1)*nnxnny]+cs[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausT;
-    }
-  }
-  //y fixed
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int i=1;i<(nnx-1);i++)
-  {
-    Ics[i+0*nnx+0*nnxnny]=(cs[i+0*nnx+0*nnxnny+1]+cs[i+0*nnx+0*nnxnny-1]-2*cs[i+0*nnx+0*nnxnny])/tausL+
-      (cs[i+(0+1)*nnx+0*nnxnny]+cs[i+(0+1)*nnx+0*nnxnny]-2*cs[i+0*nnx+0*nnxnny])/tausT+
-      (cs[i+0*nnx+(0+1)*nnxnny]+cs[i+0*nnx+(0+1)*nnxnny]-2*cs[i+0*nnx+0*nnxnny])/tausT;
-    Ics[i+(nny-1)*nnx+0*nnxnny]=(cs[i+(nny-1)*nnx+0*nnxnny+1]+cs[i+(nny-1)*nnx+0*nnxnny-1]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausL+
-      (cs[i+((nny-1)-1)*nnx+0*nnxnny]+cs[i+((nny-1)-1)*nnx+0*nnxnny]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausT+
-      (cs[i+(nny-1)*nnx+(0+1)*nnxnny]+cs[i+(nny-1)*nnx+(0+1)*nnxnny]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausT;
-    Ics[i+0*nnx+(nnz-1)*nnxnny]=(cs[i+0*nnx+(nnz-1)*nnxnny+1]+cs[i+0*nnx+(nnz-1)*nnxnny-1]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausL+
-      (cs[i+(0+1)*nnx+(nnz-1)*nnxnny]+cs[i+(0+1)*nnx+(nnz-1)*nnxnny]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[i+0*nnx+((nnz-1)-1)*nnxnny]+cs[i+0*nnx+((nnz-1)-1)*nnxnny]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausT;
-    Ics[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
-      (cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
-      (cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
-#pragma ivdep
-#pragma vector always
-    for (int k=1;k<nnz-1;k++)
-    {
-      Ics[i+0*nnx+k*nnxnny]=(cs[i+0*nnx+k*nnxnny+1]+cs[i+0*nnx+k*nnxnny-1]-2*cs[i+0*nnx+k*nnxnny])/tausL+
-        (cs[i+(0+1)*nnx+k*nnxnny]+cs[i+(0+1)*nnx+k*nnxnny]-2*cs[i+0*nnx+k*nnxnny])/tausT+
-        (cs[i+0*nnx+(k+1)*nnxnny]+cs[i+0*nnx+(k-1)*nnxnny]-2*cs[i+0*nnx+k*nnxnny])/tausT;
-      Ics[i+(nny-1)*nnx+k*nnxnny]=(cs[i+(nny-1)*nnx+k*nnxnny+1]+cs[i+(nny-1)*nnx+k*nnxnny-1]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausL+
-        (cs[i+((nny-1)-1)*nnx+k*nnxnny]+cs[i+((nny-1)-1)*nnx+k*nnxnny]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausT+
-        (cs[i+(nny-1)*nnx+(k+1)*nnxnny]+cs[i+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausT;
-    }
-    //z fixed
-#pragma ivdep
-#pragma vector always
-    for (int j=1;j<nny-1;j++)
-    {
-      Ics[i+j*nnx+0*nnxnny]=(cs[i+j*nnx+0*nnxnny+1]+cs[i+j*nnx+0*nnxnny-1]-2*cs[i+j*nnx+0*nnxnny])/tausL+
-        (cs[i+(j+1)*nnx+0*nnxnny]+cs[i+(j-1)*nnx+0*nnxnny]-2*cs[i+j*nnx+0*nnxnny])/tausT+
-        (cs[i+j*nnx+(0+1)*nnxnny]+cs[i+j*nnx+(0+1)*nnxnny]-2*cs[i+j*nnx+0*nnxnny])/tausT;
-      Ics[i+j*nnx+(nnz-1)*nnxnny]=(cs[i+j*nnx+(nnz-1)*nnxnny+1]+cs[i+j*nnx+(nnz-1)*nnxnny-1]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausL+
-        (cs[i+(j+1)*nnx+(nnz-1)*nnxnny]+cs[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausT+
-        (cs[i+j*nnx+((nnz-1)-1)*nnxnny]+cs[i+j*nnx+((nnz-1)-1)*nnxnny]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausT;
-    }
-  }
-#pragma ivdep
-#pragma vector always
-  for (int k=1;k<nnz-1;k++)
-  {
-    Ics[0+0*nnx+k*nnxnny]=(cs[0+0*nnx+k*nnxnny+1]+cs[0+0*nnx+k*nnxnny+1]-2*cs[0+0*nnx+k*nnxnny])/tausL+
-      (cs[0+(0+1)*nnx+k*nnxnny]+cs[0+(0+1)*nnx+k*nnxnny]-2*cs[0+0*nnx+k*nnxnny])/tausT+
-      (cs[0+0*nnx+(k+1)*nnxnny]+cs[0+0*nnx+(k-1)*nnxnny]-2*cs[0+0*nnx+k*nnxnny])/tausT;
-    Ics[0+(nny-1)*nnx+k*nnxnny]=(cs[0+(nny-1)*nnx+k*nnxnny+1]+cs[0+(nny-1)*nnx+k*nnxnny+1]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausL+
-      (cs[0+((nny-1)-1)*nnx+k*nnxnny]+cs[0+((nny-1)-1)*nnx+k*nnxnny]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausT+
-      (cs[0+(nny-1)*nnx+(k+1)*nnxnny]+cs[0+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausT;
-    Ics[(nnx-1)+0*nnx+k*nnxnny]=(cs[(nnx-1)+0*nnx+k*nnxnny-1]+cs[(nnx-1)+0*nnx+k*nnxnny-1]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausL+
-      (cs[(nnx-1)+(0+1)*nnx+k*nnxnny]+cs[(nnx-1)+(0+1)*nnx+k*nnxnny]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausT+
-      (cs[(nnx-1)+0*nnx+(k+1)*nnxnny]+cs[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausT;
-    Ics[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausL+
-      (cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausT+
-      (cs[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausT;
-  }
-
-#endif
-
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for (int k=1;k<nnz-1;k++)
-  {
-    for (int j=1;j<nny-1;j++)
-    {
-#pragma ivdep
-#pragma vector always
-      for (int i=1;i<nnx-1;i++)
+      Ics[0+j*nnx+0*nnxnny]=(cs[0+j*nnx+0*nnxnny+1]+cs[(nnx-1)+j*nnx+0*nnxnny]-2*cs[0+j*nnx+0*nnxnny])/tausL+
+        (cs[0+(j+1)*nnx+0*nnxnny]+cs[0+(j-1)*nnx+0*nnxnny]-2*cs[0+j*nnx+0*nnxnny])/tausT+
+        (cs[0+j*nnx+(0+1)*nnxnny]+cs[0+j*nnx+(nnz-1)*nnxnny]-2*cs[0+j*nnx+0*nnxnny])/tausT;
+      Ics[(nnx-1)+j*nnx+0*nnxnny]=(cs[(nnx-1)+j*nnx+0*nnxnny-1]+cs[(0)+j*nnx+0*nnxnny]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausL+
+        (cs[(nnx-1)+(j+1)*nnx+0*nnxnny]+cs[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausT+
+        (cs[(nnx-1)+j*nnx+(0+1)*nnxnny]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausT;
+      Ics[0+j*nnx+(nnz-1)*nnxnny]=(cs[0+j*nnx+(nnz-1)*nnxnny+1]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausL+
+        (cs[0+(j+1)*nnx+(nnz-1)*nnxnny]+cs[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[0+j*nnx+((nnz-1)-1)*nnxnny]+cs[0+j*nnx+(0)*nnxnny]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausT;
+      Ics[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cs[(0)+j*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausL+
+        (cs[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+j*nnx+(0)*nnxnny]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
       {
-        Ics[i+j*nnx+k*nnxnny]=(cs[i+j*nnx+k*nnxnny+1]+cs[i+j*nnx+k*nnxnny-1]-2*cs[i+j*nnx+k*nnxnny])/tausL+
-          (cs[i+(j+1)*nnx+k*nnxnny]+cs[i+(j-1)*nnx+k*nnxnny]-2*cs[i+j*nnx+k*nnxnny])/tausT+
-          (cs[i+j*nnx+(k+1)*nnxnny]+cs[i+j*nnx+(k-1)*nnxnny]-2*cs[i+j*nnx+k*nnxnny])/tausT;
+        Ics[0+j*nnx+k*nnxnny]=(cs[0+j*nnx+k*nnxnny+1]+cs[(nnx-1)+j*nnx+k*nnxnny]-2*cs[0+j*nnx+k*nnxnny])/tausL+
+          (cs[0+(j+1)*nnx+k*nnxnny]+cs[0+(j-1)*nnx+k*nnxnny]-2*cs[0+j*nnx+k*nnxnny])/tausT+
+          (cs[0+j*nnx+(k+1)*nnxnny]+cs[0+j*nnx+(k-1)*nnxnny]-2*cs[0+j*nnx+k*nnxnny])/tausT;
+        Ics[(nnx-1)+j*nnx+k*nnxnny]=(cs[(nnx-1)+j*nnx+k*nnxnny-1]+cs[(0)+j*nnx+k*nnxnny]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausL+
+          (cs[(nnx-1)+(j+1)*nnx+k*nnxnny]+cs[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausT+
+          (cs[(nnx-1)+j*nnx+(k+1)*nnxnny]+cs[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausT;
       }
     }
-  }
+    //y fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int i=1;i<(nnx-1);i++)
+    {
+      Ics[i+0*nnx+0*nnxnny]=(cs[i+0*nnx+0*nnxnny+1]+cs[i+0*nnx+0*nnxnny-1]-2*cs[i+0*nnx+0*nnxnny])/tausL+
+        (cs[i+(0+1)*nnx+0*nnxnny]+cs[i+(nny-1)*nnx+0*nnxnny]-2*cs[i+0*nnx+0*nnxnny])/tausT+
+        (cs[i+0*nnx+(0+1)*nnxnny]+cs[i+0*nnx+(nnz-1)*nnxnny]-2*cs[i+0*nnx+0*nnxnny])/tausT;
+      Ics[i+(nny-1)*nnx+0*nnxnny]=(cs[i+(nny-1)*nnx+0*nnxnny+1]+cs[i+(nny-1)*nnx+0*nnxnny-1]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausL+
+        (cs[i+((nny-1)-1)*nnx+0*nnxnny]+cs[i+(0)*nnx+0*nnxnny]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausT+
+        (cs[i+(nny-1)*nnx+(0+1)*nnxnny]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausT;
+      Ics[i+0*nnx+(nnz-1)*nnxnny]=(cs[i+0*nnx+(nnz-1)*nnxnny+1]+cs[i+0*nnx+(nnz-1)*nnxnny-1]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausL+
+        (cs[i+(0+1)*nnx+(nnz-1)*nnxnny]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[i+0*nnx+((nnz-1)-1)*nnxnny]+cs[i+0*nnx+(0)*nnxnny]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausT;
+      Ics[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
+        (cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[i+(0)*nnx+(nnz-1)*nnxnny]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[i+(nny-1)*nnx+(0)*nnxnny]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        Ics[i+0*nnx+k*nnxnny]=(cs[i+0*nnx+k*nnxnny+1]+cs[i+0*nnx+k*nnxnny-1]-2*cs[i+0*nnx+k*nnxnny])/tausL+
+          (cs[i+(0+1)*nnx+k*nnxnny]+cs[i+(nny-1)*nnx+k*nnxnny]-2*cs[i+0*nnx+k*nnxnny])/tausT+
+          (cs[i+0*nnx+(k+1)*nnxnny]+cs[i+0*nnx+(k-1)*nnxnny]-2*cs[i+0*nnx+k*nnxnny])/tausT;
+        Ics[i+(nny-1)*nnx+k*nnxnny]=(cs[i+(nny-1)*nnx+k*nnxnny+1]+cs[i+(nny-1)*nnx+k*nnxnny-1]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausL+
+          (cs[i+((nny-1)-1)*nnx+k*nnxnny]+cs[i+(0)*nnx+k*nnxnny]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausT+
+          (cs[i+(nny-1)*nnx+(k+1)*nnxnny]+cs[i+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausT;
+      }
+      //z fixed
+  #pragma ivdep
+  #pragma vector always
+      for (int j=1;j<nny-1;j++)
+      {
+        Ics[i+j*nnx+0*nnxnny]=(cs[i+j*nnx+0*nnxnny+1]+cs[i+j*nnx+0*nnxnny-1]-2*cs[i+j*nnx+0*nnxnny])/tausL+
+          (cs[i+(j+1)*nnx+0*nnxnny]+cs[i+(j-1)*nnx+0*nnxnny]-2*cs[i+j*nnx+0*nnxnny])/tausT+
+          (cs[i+j*nnx+(0+1)*nnxnny]+cs[i+j*nnx+(nnz-1)*nnxnny]-2*cs[i+j*nnx+0*nnxnny])/tausT;
+        Ics[i+j*nnx+(nnz-1)*nnxnny]=(cs[i+j*nnx+(nnz-1)*nnxnny+1]+cs[i+j*nnx+(nnz-1)*nnxnny-1]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausL+
+          (cs[i+(j+1)*nnx+(nnz-1)*nnxnny]+cs[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausT+
+          (cs[i+j*nnx+((nnz-1)-1)*nnxnny]+cs[i+j*nnx+(0)*nnxnny]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausT;
+      }
+    }
+  #pragma ivdep
+  #pragma vector always
+    for (int k=1;k<nnz-1;k++)
+    {
+      Ics[0+0*nnx+k*nnxnny]=(cs[0+0*nnx+k*nnxnny+1]+cs[(nnx-1)+0*nnx+k*nnxnny]-2*cs[0+0*nnx+k*nnxnny])/tausL+
+        (cs[0+(0+1)*nnx+k*nnxnny]+cs[0+(nny-1)*nnx+k*nnxnny]-2*cs[0+0*nnx+k*nnxnny])/tausT+
+        (cs[0+0*nnx+(k+1)*nnxnny]+cs[0+0*nnx+(k-1)*nnxnny]-2*cs[0+0*nnx+k*nnxnny])/tausT;
+      Ics[0+(nny-1)*nnx+k*nnxnny]=(cs[0+(nny-1)*nnx+k*nnxnny+1]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausL+
+        (cs[0+((nny-1)-1)*nnx+k*nnxnny]+cs[0+(0)*nnx+k*nnxnny]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausT+
+        (cs[0+(nny-1)*nnx+(k+1)*nnxnny]+cs[0+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausT;
+      Ics[(nnx-1)+0*nnx+k*nnxnny]=(cs[(nnx-1)+0*nnx+k*nnxnny-1]+cs[(0)+0*nnx+k*nnxnny]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausL+
+        (cs[(nnx-1)+(0+1)*nnx+k*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausT+
+        (cs[(nnx-1)+0*nnx+(k+1)*nnxnny]+cs[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausT;
+      Ics[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cs[(0)+(nny-1)*nnx+k*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausL+
+        (cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cs[(nnx-1)+(0)*nnx+k*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausT+
+        (cs[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausT;
+    }
+  #else
+    Ics[0+0*nnx+0*nnxnny]=(cs[0+0*nnx+0*nnxnny+1]+cs[0+0*nnx+0*nnxnny+1]-2*cs[0+0*nnx+0*nnxnny])/tausL+
+      (cs[0+(0+1)*nnx+0*nnxnny]+cs[0+(0+1)*nnx+0*nnxnny]-2*cs[0+0*nnx+0*nnxnny])/tausT+
+      (cs[0+0*nnx+(0+1)*nnxnny]+cs[0+0*nnx+(0+1)*nnxnny]-2*cs[0+0*nnx+0*nnxnny])/tausT;
+    Ics[0+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[0+(nny-1)*nnx+(nnz-1)*nnxnny+1]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[0+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[0+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cs[0+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
+    Ics[0+(nny-1)*nnx+0*nnxnny]=(cs[0+(nny-1)*nnx+0*nnxnny+1]+cs[0+(nny-1)*nnx+0*nnxnny+1]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausL+
+      (cs[0+((nny-1)-1)*nnx+0*nnxnny]+cs[0+((nny-1)-1)*nnx+0*nnxnny]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausT+
+      (cs[0+(nny-1)*nnx+(0+1)*nnxnny]+cs[0+(nny-1)*nnx+(0+1)*nnxnny]-2*cs[0+(nny-1)*nnx+0*nnxnny])/tausT;
+    Ics[0+0*nnx+(nnz-1)*nnxnny]=(cs[0+0*nnx+(nnz-1)*nnxnny+1]+cs[0+0*nnx+(nnz-1)*nnxnny+1]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[0+(0+1)*nnx+(nnz-1)*nnxnny]+cs[0+(0+1)*nnx+(nnz-1)*nnxnny]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[0+0*nnx+((nnz-1)-1)*nnxnny]+cs[0+0*nnx+((nnz-1)-1)*nnxnny]-2*cs[0+0*nnx+(nnz-1)*nnxnny])/tausT;
+    Ics[(nnx-1)+(nny-1)*nnx+0*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+0*nnxnny-1]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausL+
+      (cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+0*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausT+
+      (cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(0+1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+0*nnxnny])/tausT;
+    Ics[(nnx-1)+0*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny-1]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(0+1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+0*nnx+((nnz-1)-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+(nnz-1)*nnxnny])/tausT;
+    Ics[(nnx-1)+0*nnx+0*nnxnny]=(cs[(nnx-1)+0*nnx+0*nnxnny-1]+cs[(nnx-1)+0*nnx+0*nnxnny-1]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausL+
+      (cs[(nnx-1)+(0+1)*nnx+0*nnxnny]+cs[(nnx-1)+(0+1)*nnx+0*nnxnny]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausT+
+      (cs[(nnx-1)+0*nnx+(0+1)*nnxnny]+cs[(nnx-1)+0*nnx+(0+1)*nnxnny]-2*cs[(nnx-1)+0*nnx+0*nnxnny])/tausT;
+    Ics[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
+      (cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
+      (cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
+    //x fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int j=1;j<nny-1;j++)
+    {
+      Ics[0+j*nnx+0*nnxnny]=(cs[0+j*nnx+0*nnxnny+1]+cs[0+j*nnx+0*nnxnny+1]-2*cs[0+j*nnx+0*nnxnny])/tausL+
+        (cs[0+(j+1)*nnx+0*nnxnny]+cs[0+(j-1)*nnx+0*nnxnny]-2*cs[0+j*nnx+0*nnxnny])/tausT+
+        (cs[0+j*nnx+(0+1)*nnxnny]+cs[0+j*nnx+(0+1)*nnxnny]-2*cs[0+j*nnx+0*nnxnny])/tausT;
+      Ics[(nnx-1)+j*nnx+0*nnxnny]=(cs[(nnx-1)+j*nnx+0*nnxnny-1]+cs[(nnx-1)+j*nnx+0*nnxnny-1]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausL+
+        (cs[(nnx-1)+(j+1)*nnx+0*nnxnny]+cs[(nnx-1)+(j-1)*nnx+0*nnxnny]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausT+
+        (cs[(nnx-1)+j*nnx+(0+1)*nnxnny]+cs[(nnx-1)+j*nnx+(0+1)*nnxnny]-2*cs[(nnx-1)+j*nnx+0*nnxnny])/tausT;
+      Ics[0+j*nnx+(nnz-1)*nnxnny]=(cs[0+j*nnx+(nnz-1)*nnxnny+1]+cs[0+j*nnx+(nnz-1)*nnxnny+1]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausL+
+        (cs[0+(j+1)*nnx+(nnz-1)*nnxnny]+cs[0+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[0+j*nnx+((nnz-1)-1)*nnxnny]+cs[0+j*nnx+((nnz-1)-1)*nnxnny]-2*cs[0+j*nnx+(nnz-1)*nnxnny])/tausT;
+      Ics[(nnx-1)+j*nnx+(nnz-1)*nnxnny]=(cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]+cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny-1]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausL+
+        (cs[(nnx-1)+(j+1)*nnx+(nnz-1)*nnxnny]+cs[(nnx-1)+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]+cs[(nnx-1)+j*nnx+((nnz-1)-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+(nnz-1)*nnxnny])/tausT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        Ics[0+j*nnx+k*nnxnny]=(cs[0+j*nnx+k*nnxnny+1]+cs[0+j*nnx+k*nnxnny+1]-2*cs[0+j*nnx+k*nnxnny])/tausL+
+          (cs[0+(j+1)*nnx+k*nnxnny]+cs[0+(j-1)*nnx+k*nnxnny]-2*cs[0+j*nnx+k*nnxnny])/tausT+
+          (cs[0+j*nnx+(k+1)*nnxnny]+cs[0+j*nnx+(k-1)*nnxnny]-2*cs[0+j*nnx+k*nnxnny])/tausT;
+        Ics[(nnx-1)+j*nnx+k*nnxnny]=(cs[(nnx-1)+j*nnx+k*nnxnny-1]+cs[(nnx-1)+j*nnx+k*nnxnny-1]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausL+
+          (cs[(nnx-1)+(j+1)*nnx+k*nnxnny]+cs[(nnx-1)+(j-1)*nnx+k*nnxnny]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausT+
+          (cs[(nnx-1)+j*nnx+(k+1)*nnxnny]+cs[(nnx-1)+j*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+j*nnx+k*nnxnny])/tausT;
+      }
+    }
+    //y fixed
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int i=1;i<(nnx-1);i++)
+    {
+      Ics[i+0*nnx+0*nnxnny]=(cs[i+0*nnx+0*nnxnny+1]+cs[i+0*nnx+0*nnxnny-1]-2*cs[i+0*nnx+0*nnxnny])/tausL+
+        (cs[i+(0+1)*nnx+0*nnxnny]+cs[i+(0+1)*nnx+0*nnxnny]-2*cs[i+0*nnx+0*nnxnny])/tausT+
+        (cs[i+0*nnx+(0+1)*nnxnny]+cs[i+0*nnx+(0+1)*nnxnny]-2*cs[i+0*nnx+0*nnxnny])/tausT;
+      Ics[i+(nny-1)*nnx+0*nnxnny]=(cs[i+(nny-1)*nnx+0*nnxnny+1]+cs[i+(nny-1)*nnx+0*nnxnny-1]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausL+
+        (cs[i+((nny-1)-1)*nnx+0*nnxnny]+cs[i+((nny-1)-1)*nnx+0*nnxnny]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausT+
+        (cs[i+(nny-1)*nnx+(0+1)*nnxnny]+cs[i+(nny-1)*nnx+(0+1)*nnxnny]-2*cs[i+(nny-1)*nnx+0*nnxnny])/tausT;
+      Ics[i+0*nnx+(nnz-1)*nnxnny]=(cs[i+0*nnx+(nnz-1)*nnxnny+1]+cs[i+0*nnx+(nnz-1)*nnxnny-1]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausL+
+        (cs[i+(0+1)*nnx+(nnz-1)*nnxnny]+cs[i+(0+1)*nnx+(nnz-1)*nnxnny]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[i+0*nnx+((nnz-1)-1)*nnxnny]+cs[i+0*nnx+((nnz-1)-1)*nnxnny]-2*cs[i+0*nnx+(nnz-1)*nnxnny])/tausT;
+      Ics[i+(nny-1)*nnx+(nnz-1)*nnxnny]=(cs[i+(nny-1)*nnx+(nnz-1)*nnxnny+1]+cs[i+(nny-1)*nnx+(nnz-1)*nnxnny-1]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausL+
+        (cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]+cs[i+((nny-1)-1)*nnx+(nnz-1)*nnxnny]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT+
+        (cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]+cs[i+(nny-1)*nnx+((nnz-1)-1)*nnxnny]-2*cs[i+(nny-1)*nnx+(nnz-1)*nnxnny])/tausT;
+  #pragma ivdep
+  #pragma vector always
+      for (int k=1;k<nnz-1;k++)
+      {
+        Ics[i+0*nnx+k*nnxnny]=(cs[i+0*nnx+k*nnxnny+1]+cs[i+0*nnx+k*nnxnny-1]-2*cs[i+0*nnx+k*nnxnny])/tausL+
+          (cs[i+(0+1)*nnx+k*nnxnny]+cs[i+(0+1)*nnx+k*nnxnny]-2*cs[i+0*nnx+k*nnxnny])/tausT+
+          (cs[i+0*nnx+(k+1)*nnxnny]+cs[i+0*nnx+(k-1)*nnxnny]-2*cs[i+0*nnx+k*nnxnny])/tausT;
+        Ics[i+(nny-1)*nnx+k*nnxnny]=(cs[i+(nny-1)*nnx+k*nnxnny+1]+cs[i+(nny-1)*nnx+k*nnxnny-1]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausL+
+          (cs[i+((nny-1)-1)*nnx+k*nnxnny]+cs[i+((nny-1)-1)*nnx+k*nnxnny]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausT+
+          (cs[i+(nny-1)*nnx+(k+1)*nnxnny]+cs[i+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[i+(nny-1)*nnx+k*nnxnny])/tausT;
+      }
+      //z fixed
+  #pragma ivdep
+  #pragma vector always
+      for (int j=1;j<nny-1;j++)
+      {
+        Ics[i+j*nnx+0*nnxnny]=(cs[i+j*nnx+0*nnxnny+1]+cs[i+j*nnx+0*nnxnny-1]-2*cs[i+j*nnx+0*nnxnny])/tausL+
+          (cs[i+(j+1)*nnx+0*nnxnny]+cs[i+(j-1)*nnx+0*nnxnny]-2*cs[i+j*nnx+0*nnxnny])/tausT+
+          (cs[i+j*nnx+(0+1)*nnxnny]+cs[i+j*nnx+(0+1)*nnxnny]-2*cs[i+j*nnx+0*nnxnny])/tausT;
+        Ics[i+j*nnx+(nnz-1)*nnxnny]=(cs[i+j*nnx+(nnz-1)*nnxnny+1]+cs[i+j*nnx+(nnz-1)*nnxnny-1]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausL+
+          (cs[i+(j+1)*nnx+(nnz-1)*nnxnny]+cs[i+(j-1)*nnx+(nnz-1)*nnxnny]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausT+
+          (cs[i+j*nnx+((nnz-1)-1)*nnxnny]+cs[i+j*nnx+((nnz-1)-1)*nnxnny]-2*cs[i+j*nnx+(nnz-1)*nnxnny])/tausT;
+      }
+    }
+  #pragma ivdep
+  #pragma vector always
+    for (int k=1;k<nnz-1;k++)
+    {
+      Ics[0+0*nnx+k*nnxnny]=(cs[0+0*nnx+k*nnxnny+1]+cs[0+0*nnx+k*nnxnny+1]-2*cs[0+0*nnx+k*nnxnny])/tausL+
+        (cs[0+(0+1)*nnx+k*nnxnny]+cs[0+(0+1)*nnx+k*nnxnny]-2*cs[0+0*nnx+k*nnxnny])/tausT+
+        (cs[0+0*nnx+(k+1)*nnxnny]+cs[0+0*nnx+(k-1)*nnxnny]-2*cs[0+0*nnx+k*nnxnny])/tausT;
+      Ics[0+(nny-1)*nnx+k*nnxnny]=(cs[0+(nny-1)*nnx+k*nnxnny+1]+cs[0+(nny-1)*nnx+k*nnxnny+1]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausL+
+        (cs[0+((nny-1)-1)*nnx+k*nnxnny]+cs[0+((nny-1)-1)*nnx+k*nnxnny]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausT+
+        (cs[0+(nny-1)*nnx+(k+1)*nnxnny]+cs[0+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[0+(nny-1)*nnx+k*nnxnny])/tausT;
+      Ics[(nnx-1)+0*nnx+k*nnxnny]=(cs[(nnx-1)+0*nnx+k*nnxnny-1]+cs[(nnx-1)+0*nnx+k*nnxnny-1]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausL+
+        (cs[(nnx-1)+(0+1)*nnx+k*nnxnny]+cs[(nnx-1)+(0+1)*nnx+k*nnxnny]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausT+
+        (cs[(nnx-1)+0*nnx+(k+1)*nnxnny]+cs[(nnx-1)+0*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+0*nnx+k*nnxnny])/tausT;
+      Ics[(nnx-1)+(nny-1)*nnx+k*nnxnny]=(cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]+cs[(nnx-1)+(nny-1)*nnx+k*nnxnny-1]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausL+
+        (cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]+cs[(nnx-1)+((nny-1)-1)*nnx+k*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausT+
+        (cs[(nnx-1)+(nny-1)*nnx+(k+1)*nnxnny]+cs[(nnx-1)+(nny-1)*nnx+(k-1)*nnxnny]-2*cs[(nnx-1)+(nny-1)*nnx+k*nnxnny])/tausT;
+    }
+
+  #endif
+
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+    for (int k=1;k<nnz-1;k++)
+    {
+      for (int j=1;j<nny-1;j++)
+      {
+  #pragma ivdep
+  #pragma vector always
+        for (int i=1;i<nnx-1;i++)
+        {
+          Ics[i+j*nnx+k*nnxnny]=(cs[i+j*nnx+k*nnxnny+1]+cs[i+j*nnx+k*nnxnny-1]-2*cs[i+j*nnx+k*nnxnny])/tausL+
+            (cs[i+(j+1)*nnx+k*nnxnny]+cs[i+(j-1)*nnx+k*nnxnny]-2*cs[i+j*nnx+k*nnxnny])/tausT+
+            (cs[i+j*nnx+(k+1)*nnxnny]+cs[i+j*nnx+(k-1)*nnxnny]-2*cs[i+j*nnx+k*nnxnny])/tausT;
+        }
+      }
+    }
 }
 
 #endif
 
-//Bardia 2020
+//PTMs 2020-2021
 void CSubcell::printsc0d(double t, double v,std::string filename){
   ofstream results0d;
   results0d.open(filename.c_str(), std::ofstream::app);
@@ -2386,6 +2440,10 @@ void CSubcell::printsc0d(double t, double v,std::string filename){
             << this->calcjcalave() << "\t" 
             << this->icaave << "\t"
             << this->calcjnacaave() << "\t"
+
+            //SR Ca concentration
+            //SR Release
+            //
 
             << std::endl;
 
@@ -2420,6 +2478,440 @@ void CSubcell::voltage_clamp(double t, double peak_v, bool output, double dt, do
     std::string fname_voltage_clamp = "results/0d_results_vc_20.txt";
     printsc0d(t, v, fname_voltage_clamp);
   }
-  // std::cout << "After output" <<  std::endl;
 
 }
+
+
+void CSubcell::allocate_memory_PTM_CaM_vars(int n){
+
+  RyR_CKp = new double(n);
+  RyR_PKAp = new double(n);
+  //All Parameters
+  CaMtotDyad = new double(n);
+  BtotDyad = new double(n);
+  CaMKIItotDyad = new double(n);
+  CaNtotDyad = new double(n);
+  PP1totDyad = new double(n);
+  CaMtotSL = new double(n);
+  BtotSL = new double(n);
+  CaMKIItotSL = new double(n);
+  CaNtotSL = new double(n);
+  PP1totSL = new double(n);
+  CaMtotCyt = new double(n);
+  BtotCyt = new double(n);
+  CaMKIItotCyt = new double(n);
+  CaNtotCyt = new double(n);
+  PP1totCyt = new double(n);
+  LCCtotDyad = new double(n);
+  RyRtot = new double(n);
+  PP1_dyad = new double(n);
+  PP2A_dyad = new double(n);
+  OA = new double(n);
+  LCCtotSL = new double(n);
+  PP1_SL = new double(n);
+  PLBtot = new double(n);
+  Ligtot = new double(n);
+  LCCtotBA = new double(n);
+  RyRtotBA = new double(n);
+  PLBtotBA = new double(n);
+  TnItotBA = new double(n);
+  IKstotBA = new double(n);
+  ICFTRtotBA = new double(n);
+  PP1_PLBtot = new double(n);
+  PLMtotBA = new double(n);
+  MyototBA = new double(n);
+  IKrtotBA = new double(n);
+  IClCatotBA = new double(n);
+  CKIIOE = new double(n);
+  recoveryTime = new double(n);
+
+  ////CaM State Variables
+
+  //Ca Fluxes from CaM
+  JCaCyt = new double(n);
+  JCaSL = new double(n);
+  JCaDyad = new double(n);
+
+  //CaM_Dyad
+  CaM_dyad = new double(n);
+  Ca2CaM_dyad = new double(n);
+  Ca4CaM_dyad = new double(n);
+  CaMB_dyad = new double(n);
+  Ca2CaMB_dyad = new double(n);
+  Ca4CaMB_dyad = new double(n);
+  Pb2_dyad = new double(n);
+  Pb_dyad = new double(n);
+  Pt_dyad = new double(n);
+  Pt2_dyad = new double(n);
+  Pa_dyad = new double(n);
+  Ca4CaN_dyad = new double(n);
+  CaMCa4CaN_dyad = new double(n);
+  Ca2CaMCa4CaN_dyad = new double(n);
+  Ca4CaMCa4CaN_dyad = new double(n);
+
+  //CaM_SL
+  CaM_sl = new double(n);
+  Ca2CaM_sl = new double(n);
+  Ca4CaM_sl = new double(n);
+  CaMB_sl = new double(n);
+  Ca2CaMB_sl = new double(n);
+  Ca4CaMB_sl = new double(n);
+  Pb2_sl = new double(n);
+  Pb_sl = new double(n);
+  Pt_sl = new double(n);
+  Pt2_sl = new double(n);
+  Pa_sl = new double(n);
+  Ca4CaN_sl = new double(n);
+  CaMCa4CaN_sl = new double(n);
+  Ca2CaMCa4CaN_sl = new double(n);
+  Ca4CaMCa4CaN_sl = new double(n);
+
+  //CaM_cytosol
+  CaM_cyt = new double(n);
+  Ca2CaM_cyt = new double(n);
+  Ca4CaM_cyt = new double(n);
+  CaMB_cyt = new double(n);
+  Ca2CaMB_cyt = new double(n);
+  Ca4CaMB_cyt = new double(n);
+  Pb2_cyt = new double(n);
+  Pb_cyt = new double(n);
+  Pt_cyt = new double(n);
+  Pt2_cyt = new double(n);
+  Pa_cyt = new double(n);
+  Ca4CaN_cyt = new double(n);
+  CaMCa4CaN_cyt = new double(n);
+  Ca2CaMCa4CaN_cyt = new double(n);
+  Ca4CaMCa4CaN_cyt = new double(n);
+}
+
+
+void CSubcell::init_parameters_PTM_CaM(int n){
+  // freq = 1.0;                 // [Hz] CHANGE DEPENDING ON FREQUENCY
+  // cycleLength = 1e3/freq;     // [ms]
+  CaMtotDyad[n] = 418;             //[uM]
+  BtotDyad[n] = 1.54/8.293e-4;        //[uM]
+  CaMKIItotDyad[n] = 120;        //[uM]
+  CaNtotDyad[n] = 3e-3/8.293e-4;    //[uM]
+  PP1totDyad[n] = 96.5;             //[uM]
+  CaMtotSL[n] = 5.65;                 //[uM]
+  BtotSL[n] = 24.2;                     //[uM]
+  CaMKIItotSL[n] = 120*8.293e-4;   //[uM]
+  CaNtotSL[n] = 3e-3;                 //[uM]
+  PP1totSL[n] = 0.57;                 //[uM]
+  CaMtotCyt[n] = 5.65;               //[uM]
+  BtotCyt[n] = 24.2;                   //[uM]
+  CaMKIItotCyt[n] = 120*8.293e-4; //[uM]
+  CaNtotCyt[n] = 3e-3;               //[uM]
+  PP1totCyt[n] = 0.57;               //[uM]
+
+  // ADJUST CAMKII ACTIVITY LEVELS (expression = 'WT', 'OE', or 'KO')
+  expression[n] = (char* )"WT";
+  CKIIOE[n] = 0; // Should be zero during "WT" and "KO" runs
+
+  if(expression[n] =="OE"){
+    CKIIOE[n] = 1; // Flag for CKII OE in ECC file (0=WT, 1=OE) - for Ito and INa
+    CaMKIItotDyad[n] = 120*6;          // [uM] 
+    CaMKIItotSL[n] = 120*8.293e-4*6;   // [uM]
+    CaMKIItotCyt[n] = 120*8.293e-4*6;  // [uM]
+  }
+  else if(expression[n] == "KO"){
+    CaMKIItotDyad[n] = 0;              // [uM] 
+    CaMKIItotSL[n] = 0;                // [uM]
+    CaMKIItotCyt[n] = 0;               // [uM]
+  }
+  else{
+    expression[n] = (char* )"WT";
+  }
+
+  // Parameters for CaMKII module
+  LCCtotDyad[n] = 31.4*.9;       // [uM] - Total Dyadic [LCC] - (umol/l dyad)
+  LCCtotSL[n] = 0.0846;          // [uM] - Total Subsarcolemmal [LCC] (umol/l sl)
+  RyRtot[n] = 382.6;             // [uM] - Total RyR (in Dyad)
+  PP1_dyad[n] = 95.7;            // [uM] - Total dyadic [PP1]
+  PP1_SL[n] = 0.57;              // [uM] - Total Subsarcolemmal [PP1]
+  PP2A_dyad[n] = 95.76;          // [uM] - Total dyadic PP2A
+  OA[n] = 0;                     // [uM] - PP1/PP2A inhibitor Okadaic Acid
+  PLBtot[n] = 38;                // [uM] - Total [PLB] in cytosolic units
+
+  // Parameters for BAR module
+  Ligtot[n] = 0;// 0.1 or 0.02    // [uM] - SET LIGAND CONCENTRATION HERE
+  LCCtotBA[n] = 0.025;           // [uM] - [umol/L cytosol]
+  RyRtotBA[n] = 0.135;           // [uM] - [umol/L cytosol]
+  PLBtotBA[n] = PLBtot[n];          // [uM] - [umol/L cytosol]
+  TnItotBA[n] = 70;              // [uM] - [umol/L cytosol]
+  IKstotBA[n] = 0.025;           // [uM] - [umol/L cytosol]
+  ICFTRtotBA[n] = 0.025;         // [uM] - [umol/L cytosol]
+  PP1_PLBtot[n] = 0.89;          // [uM] - [umol/L cytosol]
+  PLMtotBA[n] = 48;              // [uM] - [umol/L cytosol]
+  MyototBA[n] = 70;              // [uM] - [umol/L cytosol]
+  IKrtotBA[n] = 0.025;           // [uM] - [umol/L cytosol]
+  IClCatotBA[n] = 0.025;         // [uM] - [umol/L cytosol]
+
+  // For Recovery from inactivation of LCC
+  recoveryTime[n] = 10;  // initialize to smallest value
+
+}
+
+
+  // pCaMDyad = [K, Mg, CaMtotDyad, 0, CaMKIItotDyad, CaNtotDyad, PP1totDyad, CaDyad, cycleLength, compart_dyad];
+void CSubcell::calc_dydt_CaM_ODEs(
+  int id, double* dydt_CaM,
+  //CaM State Variables
+  double& Ca2CaM, double& Ca4CaM, double& CaMB, double& Ca2CaMB, double& Ca4CaMB,
+  double& Pb2, double& Pb, double& Pt, double& Pt2, double& Pa,
+  double& CaMCaN, double& Ca2CaMCaN, double& Ca4CaMCaN, double& CaM,
+  double& Ca4CaN, double& CaMCa4CaN, double& Ca2CaMCa4CaN, double& Ca4CaMCa4CaN,
+
+  //CaM Parameters 
+  double CaMtot, double Btot, double CaMKIItot, double CaNtot, double PP1tot, double Ca, 
+  int CaM_compartment)
+
+{
+  double K = 135; // mM
+  double Mg = 1; //mM
+
+
+  // Negroni et al model - CaM module
+
+  //// Descriptions for state variables
+  // Ca2CaM = y(1);  // 2 Ca bound to C terminal sites
+  // Ca4CaM = y(2);  // 4 Ca bound
+  // CaMB = y(3);   
+  // Ca2CaMB = y(4);
+  // Ca4CaMB = y(5);
+  // Pb2 = y(6);     // probability of a Ca2CaM bound CaMKII subunit
+  // Pb = y(7);      // probability of a Ca4CaM bound CaMKII subunit
+  // Pt = y(8);      // probability of a Ca4CaM bound autophosphorylated CaMKII subunit
+  // Pt2 = y(9);     // probability of a Ca2CaMxx bound autophosphorylated CaMKII subunit
+  // Pa = y(10);     // probability of an autonomous autophosphorylated CaMKII subunit
+  // CaMCaN = y(11);
+  // Ca2CaMCaN = y(12);
+  // Ca4CaMCaN = y(13);  // active calcineurin
+  // description of intermediate variables
+  // CaM- Ca free CaM
+  ////
+
+  // Parameters
+  // Ca/CaM parameters
+  double Kd02, Kd24;
+  if(Mg <= 1){
+      Kd02 = 0.0025*(1+K/0.94-Mg/0.012)*(1+K/8.1+Mg/0.022);  // [uM^2]
+      Kd24 = 0.128*(1+K/0.64+Mg/0.0014)*(1+K/13.0-Mg/0.153); // [uM^2]
+  }
+  else{
+      Kd02 = 0.0025*(1+K/0.94-1/0.012+(Mg-1)/0.060)*(1+K/8.1+1/0.022+(Mg-1)/0.068);   // [uM^2]
+      Kd24 = 0.128*(1+K/0.64+1/0.0014+(Mg-1)/0.005)*(1+K/13.0-1/0.153+(Mg-1)/0.150);  // [uM^2]
+  }
+
+  double k20 = 10;               // [s^-1]      
+  double k02 = k20/Kd02;         // [uM^-2 s^-1]
+  double k42 = 500;              // [s^-1]      
+  double k24 = k42/Kd24;         // [uM^-2 s^-1]
+
+  // CaM buffering (B) parameters
+  double k0Boff = 0.0014;        // [s^-1] 
+  double k0Bon = k0Boff/0.2;   // [uM^-1 s^-1] kon = koff/Kd
+  double k2Boff = k0Boff/100;    // [s^-1] 
+  double k2Bon = k0Bon;          // [uM^-1 s^-1]
+  double k4Boff = k2Boff;        // [s^-1]
+  double k4Bon = k0Bon;          // [uM^-1 s^-1]
+  // using thermodynamic constraints
+  double k20B = k20/100; // [s^-1] thermo constraint on loop 1
+  double k02B = k02;     // [uM^-2 s^-1] 
+  double k42B = k42;     // [s^-1] thermo constraint on loop 2
+  double k24B = k24;     // [uM^-2 s^-1]
+
+  // CaMKII parameters
+  // Wi Wa Wt Wp
+  double kbi = 2.2;      // [s^-1] (Ca4CaM dissocation from Wb)
+  double kib = kbi/33.5e-3; // [uM^-1 s^-1]
+  double kib2 = kib;
+  double kb2i = kib2*5;
+  double kb24 = k24;
+  double kb42 = k42*33.5e-3/5;
+  double kpp1 = 1.72;    // [s^-1] (PP1-dep dephosphorylation rates)
+  double Kmpp1 = 11.5;   // [uM]
+  double kta = kbi/1000; // [s^-1] (Ca4CaM dissociation from Wt)
+  double kat = kib;      // [uM^-1 s^-1] (Ca4CaM reassociation with Wa)
+  double kt42 = k42*33.5e-6/5;
+  double kt24 = k24;
+  double kat2 = kib;
+  double kt2a = kib*5;
+
+  // CaN parameters
+  double kcanCaoff = 1;              // [s^-1] 
+  double kcanCaon = kcanCaoff/0.5;   // [uM^-1 s^-1] 
+  double kcanCaM4on = 46;            // [uM^-1 s^-1]
+  double kcanCaM4off = 1.3e-3;       // [s^-1]
+  double kcanCaM2on = kcanCaM4on;
+  double kcanCaM2off = 2508*kcanCaM4off;
+  double kcanCaM0on = kcanCaM4on;
+  double kcanCaM0off = 165*kcanCaM2off;
+  double k02can = k02;
+  double k20can = k20/165;
+  double k24can = k24;
+  double k42can = k20/2508;
+
+  // CaM Reaction fluxes
+  double rcn02 = k02*pow(Ca,2)*CaM - k20*Ca2CaM;
+  double rcn24 = k24*pow(Ca,2)*Ca2CaM - k42*Ca4CaM;
+  // CaM buffer fluxes
+  double B = Btot - CaMB - Ca2CaMB - Ca4CaMB;
+  double rcn02B = k02B*pow(Ca,2)*CaMB - k20B*Ca2CaMB;
+  double rcn24B = k24B*pow(Ca,2)*Ca2CaMB - k42B*Ca4CaMB;
+  double rcn0B = k0Bon*CaM*B - k0Boff*CaMB;
+  double rcn2B = k2Bon*Ca2CaM*B - k2Boff*Ca2CaMB;
+  double rcn4B = k4Bon*Ca4CaM*B - k4Boff*Ca4CaMB;
+  // CaN reaction fluxes 
+  double Ca2CaN = CaNtot - Ca4CaN - CaMCa4CaN - Ca2CaMCa4CaN - Ca4CaMCa4CaN;
+  double rcnCa4CaN = kcanCaon*pow(Ca,2)*Ca2CaN - kcanCaoff*Ca4CaN;
+  double rcn02CaN = k02can*pow(Ca,2)*CaMCa4CaN - k20can*Ca2CaMCa4CaN; 
+  double rcn24CaN = k24can*pow(Ca,2)*Ca2CaMCa4CaN - k42can*Ca4CaMCa4CaN;
+  double rcn0CaN = kcanCaM0on*CaM*Ca4CaN - kcanCaM0off*CaMCa4CaN;
+  double rcn2CaN = kcanCaM2on*Ca2CaM*Ca4CaN - kcanCaM2off*Ca2CaMCa4CaN;
+  double rcn4CaN = kcanCaM4on*Ca4CaM*Ca4CaN - kcanCaM4off*Ca4CaMCa4CaN;
+  // CaMKII reaction fluxes
+  double Pi = 1 - Pb2 - Pb - Pt - Pt2 - Pa;
+  double rcnCKib2 = kib2*Ca2CaM*Pi - kb2i*Pb2;
+  double rcnCKb2b = kb24*pow(Ca,2)*Pb2 - kb42*Pb;
+  double rcnCKib = kib*Ca4CaM*Pi - kbi*Pb;
+  double T = Pb + Pt + Pt2 + Pa;
+  double kbt = 0.055*T + .0074*pow(T,2) + 0.015*pow(T,3);
+  double rcnCKbt = kbt*Pb - kpp1*PP1tot*Pt/(Kmpp1+CaMKIItot*Pt);
+  double rcnCKtt2 = kt42*Pt - kt24*pow(Ca,2)*Pt2;
+  double rcnCKta = kta*Pt - kat*Ca4CaM*Pa;
+  double rcnCKt2a = kt2a*Pt2 - kat2*Ca2CaM*Pa;
+  double rcnCKt2b2 = kpp1*PP1tot*Pt2/(Kmpp1+CaMKIItot*Pt2);
+  double rcnCKai = kpp1*PP1tot*Pa/(Kmpp1+CaMKIItot*Pa);
+
+  // CaM equations
+  double dCaM = 1e-3*(-rcn02 - rcn0B - rcn0CaN);
+  double dCa2CaM = 1e-3*(rcn02 - rcn24 - rcn2B - rcn2CaN + CaMKIItot*(-rcnCKib2 + rcnCKt2a) );
+  double dCa4CaM = 1e-3*(rcn24 - rcn4B - rcn4CaN + CaMKIItot*(-rcnCKib+rcnCKta) );
+  double dCaMB = 1e-3*(rcn0B-rcn02B);
+  double dCa2CaMB = 1e-3*(rcn02B + rcn2B - rcn24B);
+  double dCa4CaMB = 1e-3*(rcn24B + rcn4B);
+
+  // CaMKII equations
+  double dPb2 = 1e-3*(rcnCKib2 - rcnCKb2b + rcnCKt2b2); // Pb2
+  double dPb = 1e-3*(rcnCKib + rcnCKb2b - rcnCKbt);    // Pb
+  double dPt = 1e-3*(rcnCKbt-rcnCKta-rcnCKtt2);        // Pt
+  double dPt2 = 1e-3*(rcnCKtt2-rcnCKt2a-rcnCKt2b2);     // Pt2
+  double dPa = 1e-3*(rcnCKta+rcnCKt2a-rcnCKai);       // Pa
+
+  // CaN equations
+  double dCa4CaN = 1e-3*(rcnCa4CaN - rcn0CaN - rcn2CaN - rcn4CaN);                       // Ca4CaN
+  double dCaMCa4CaN = 1e-3*(rcn0CaN - rcn02CaN);           // CaMCa4CaN
+  double dCa2CaMCa4CaN = 1e-3*(rcn2CaN+rcn02CaN-rcn24CaN);    // Ca2CaMCa4CaN
+  double dCa4CaMCa4CaN = 1e-3*(rcn4CaN+rcn24CaN);             // Ca4CaMCa4CaN
+
+  double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
+  
+  //Assign dydt
+  dydt_CaM = dydt;
+
+  // write to global variables for adjusting Ca buffering in EC coupling model
+  double JCa = 1e-3*(2*CaMKIItot*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
+
+  if(CaM_compartment == 0){
+    JCaCyt[id] = JCa;
+  }
+  else if(CaM_compartment == 1){
+    JCaSL[id] = JCa;
+  }
+  else if(CaM_compartment == 2){
+    JCaDyad[id] = JCa;
+  }
+  else{
+    std::cout <<"Error: Unrecognized CaM_compartment in subcell.cc: " << CaM_compartment << std::endl;
+    std::exit(1);
+  }
+
+}
+
+
+void CSubcell::solve_ODE_CaM(int id, double dt, double* dydt_CaM, int CaM_compartment){
+  int n_CaM_params = 15;
+  // double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
+  //CaM Cytosol
+  if(CaM_compartment == 0){
+    CaM_cyt[id] += dydt_CaM[0]*dt;
+    Ca2CaM_cyt[id] += dydt_CaM[1]*dt;
+    Ca4CaM_cyt[id] += dydt_CaM[2]*dt;
+    CaMB_cyt[id] += dydt_CaM[3]*dt;
+    Ca2CaMB_cyt[id] += dydt_CaM[4]*dt;
+    Ca4CaMB_cyt[id] += dydt_CaM[5]*dt;
+    Pb2_cyt[id] += dydt_CaM[6]*dt;
+    Pb_cyt[id] += dydt_CaM[7]*dt;
+    Pt_cyt[id] += dydt_CaM[8]*dt;
+    Pt2_cyt[id] += dydt_CaM[9]*dt;
+    Pa_cyt[id] += dydt_CaM[10]*dt;
+    Ca4CaN_cyt[id] += dydt_CaM[11]*dt;
+    CaMCa4CaN_cyt[id] += dydt_CaM[12]*dt;
+    Ca2CaMCa4CaN_cyt[id] += dydt_CaM[13]*dt;
+    Ca4CaMCa4CaN_cyt[id] += dydt_CaM[14]*dt;
+  } 
+  //CaM Sarcolemmal
+  else if(CaM_compartment == 1){
+    CaM_sl[id] += dydt_CaM[0]*dt;
+    Ca2CaM_sl[id] += dydt_CaM[1]*dt;
+    Ca4CaM_sl[id] += dydt_CaM[2]*dt;
+    CaMB_sl[id] += dydt_CaM[3]*dt;
+    Ca2CaMB_sl[id] += dydt_CaM[4]*dt;
+    Ca4CaMB_sl[id] += dydt_CaM[5]*dt;
+    Pb2_sl[id] += dydt_CaM[6]*dt;
+    Pb_sl[id] += dydt_CaM[7]*dt;
+    Pt_sl[id] += dydt_CaM[8]*dt;
+    Pt2_sl[id] += dydt_CaM[9]*dt;
+    Pa_sl[id] += dydt_CaM[10]*dt;
+    Ca4CaN_sl[id] += dydt_CaM[11]*dt;
+    CaMCa4CaN_sl[id] += dydt_CaM[12]*dt;
+    Ca2CaMCa4CaN_sl[id] += dydt_CaM[13]*dt;
+    Ca4CaMCa4CaN_sl[id] += dydt_CaM[14]*dt;
+  }
+  //CaM Dyad/Cleft space
+  else if(CaM_compartment == 2){
+    CaM_dyad[id] += dydt_CaM[0]*dt;
+    Ca2CaM_dyad[id] += dydt_CaM[1]*dt;
+    Ca4CaM_dyad[id] += dydt_CaM[2]*dt;
+    CaMB_dyad[id] += dydt_CaM[3]*dt;
+    Ca2CaMB_dyad[id] += dydt_CaM[4]*dt;
+    Ca4CaMB_dyad[id] += dydt_CaM[5]*dt;
+    Pb2_dyad[id] += dydt_CaM[6]*dt;
+    Pb_dyad[id] += dydt_CaM[7]*dt;
+    Pt_dyad[id] += dydt_CaM[8]*dt;
+    Pt2_dyad[id] += dydt_CaM[9]*dt;
+    Pa_dyad[id] += dydt_CaM[10]*dt;
+    Ca4CaN_dyad[id] += dydt_CaM[11]*dt;
+    CaMCa4CaN_dyad[id] += dydt_CaM[12]*dt;
+    Ca2CaMCa4CaN_dyad[id] += dydt_CaM[13]*dt;
+    Ca4CaMCa4CaN_dyad[id] += dydt_CaM[14]*dt;
+  }
+  else{
+    std::cout << "Error: Unreognized CaM_compartment in solve_ODE_CaM: " << CaM_compartment << std::endl;
+    exit(0);
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
