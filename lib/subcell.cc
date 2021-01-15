@@ -160,7 +160,7 @@ void CSubcell::init(double initci, double initcj)
   //TODO Create arrays for Soltis-Saucerman/Negroni model
 
   #ifdef ___PTM
-    allocate_memory_PTM_CaM_vars(n);
+    allocate_memory_all_PTM_vars(n);
   #endif 
 
   #ifdef ___DETERMINISTIC
@@ -817,8 +817,8 @@ void CSubcell::pace(double v, double nai)
     //Soltis Saucerman PTM 
     //0 < RyR_CKP < 1
     //0 < RYR_PKAp < 1
-    double fCKII_RyR = (20 * RyR_CKp / 3.0 - 1 / 3.0); //≈ 1.0005, Max = 19/3, 6
-    double fPKA_RyR = RyR_PKAp * 1.025 + 0.9750; //1.025*0.025 + 0.9750= 1.00065, Max = 2
+    double fCKII_RyR = (20 * RyR_CKp[id] / 3.0 - 1 / 3.0); //≈ 1.0005, Max = 19/3, 6
+    double fPKA_RyR = RyR_PKAp[id] * 1.025 + 0.9750; //1.025*0.025 + 0.9750= 1.00065, Max = 2
     k12 *= (fCKII_RyR + fPKA_RyR - 1); //*= 1.0005, Max 7
     k43 *= (fCKII_RyR + fPKA_RyR - 1); // Max 7
 
@@ -970,14 +970,14 @@ void CSubcell::pace(double v, double nai)
   //Main PTM ODEs
 #ifdef ___PTM
 
+  //CaM Equations
     //CaM Dyad
     double* dydt_CaMDyad;
     dydt_CaMDyad = calc_dydt_CaM_ODEs(id, dydt_CaMDyad,
       //CaM Dyad/Cleft State Variables
       Ca2CaM_dyad[id],Ca4CaM_dyad[id],CaMB_dyad[id],Ca2CaMB_dyad[id],Ca4CaMB_dyad[id],
       Pb2_dyad[id],Pb_dyad[id],Pt_dyad[id],Pt2_dyad[id],Pa_dyad[id],
-      CaMCaN_dyad[id],Ca2CaMCaN_dyad[id],Ca4CaMCaN_dyad[id], CaM_dyad[id],
-      Ca4CaN_dyad[id], CaMCa4CaN_dyad[id],Ca2CaMCa4CaN_dyad[id],Ca4CaMCa4CaN_dyad[id],
+      CaM_dyad[id],Ca4CaN_dyad[id], CaMCa4CaN_dyad[id],Ca2CaMCa4CaN_dyad[id],Ca4CaMCa4CaN_dyad[id],
 
 
       //CaM Dyad/Cleft Parameters
@@ -989,8 +989,7 @@ void CSubcell::pace(double v, double nai)
       //CaM Sarcolemmal State Variables
       Ca2CaM_sl[id],Ca4CaM_sl[id],CaMB_sl[id],Ca2CaMB_sl[id],Ca4CaMB_sl[id],
       Pb2_sl[id],Pb_sl[id],Pt_sl[id],Pt2_sl[id],Pa_sl[id],
-      CaMCaN_sl[id],Ca2CaMCaN_sl[id],Ca4CaMCaN_sl[id], CaM_sl[id],
-      Ca4CaN_sl[id], CaMCa4CaN_sl[id],Ca2CaMCa4CaN_sl[id],Ca4CaMCa4CaN_sl[id],
+      CaM_sl[id],Ca4CaN_sl[id], CaMCa4CaN_sl[id],Ca2CaMCa4CaN_sl[id],Ca4CaMCa4CaN_sl[id],
 
 
       //CaM Sarcolemmal Parameters
@@ -1002,8 +1001,7 @@ void CSubcell::pace(double v, double nai)
       //CaM Cytosol State Variables
       Ca2CaM_cyt[id],Ca4CaM_cyt[id],CaMB_cyt[id],Ca2CaMB_cyt[id],Ca4CaMB_cyt[id],
       Pb2_cyt[id],Pb_cyt[id],Pt_cyt[id],Pt2_cyt[id],Pa_cyt[id],
-      CaMCaN_cyt[id],Ca2CaMCaN_cyt[id],Ca4CaMCaN_cyt[id], CaM_cyt[id],
-      Ca4CaN_cyt[id], CaMCa4CaN_cyt[id],Ca2CaMCa4CaN_cyt[id],Ca4CaMCa4CaN_cyt[id],
+      CaM_cyt[id],Ca4CaN_cyt[id], CaMCa4CaN_cyt[id],Ca2CaMCa4CaN_cyt[id],Ca4CaMCa4CaN_cyt[id],
 
 
       //CaM Cytosol Parameters
@@ -1013,6 +1011,32 @@ void CSubcell::pace(double v, double nai)
     solve_ODE_CaM(id, dt, dydt_CaMSL, 1);
     solve_ODE_CaM(id, dt, dydt_CaMCyt, 0);
 
+  //CaMKII Equations
+    CaMKIIactDyad[id] = CaMKIItotDyad[id]*(Pb_dyad[id]+Pt_dyad[id]+Pt2_dyad[id]+Pa_dyad[id]); // Multiply total by fraction
+    CaMKIIactSL[id] = CaMKIItotSL[id]*(Pb_sl[id]+Pt_sl[id]+Pt2_sl[id]+Pa_sl[id]);
+
+    //Original
+    // PP1_PLB_avail[id] = y(83+6+45+6+22)./PP1_PLBtot + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
+    
+    //TODO: PLACEHOLDER, y(83+6+45+6+22) depends on the B-AR module which is not implemented
+    PP1_PLB_avail[id] = 0.8819/PP1_PLBtot[id] + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
+
+    double* dydt_CaMKII;
+    calc_dydt_CaMKII_ODEs(
+      id, dydt_CaMKII
+      //CaMKII State Variables
+      LCC_PKAp[id], LCC_CKdyadp[id], LCC_CKslp[id],
+      RyR2809p[id], RyR2815p[id], 
+      PLBT17p[id],
+
+      //CaMKII Parameters
+      CaMKIIactDyad[id], LCCtotDyad[id],
+      RyRtot[id], PP1_dyad[id], PP2A_dyad[id],
+      OA[id], PLBtot[id], CaMKIIactSL[id], 
+      LCCtotSL[id], PP1_SL[id], PP1_PLB_avail[id]
+    );
+
+    solve_ODE_CaMKII(id, dt, dydt_CaMKII);
 
 #endif
 
@@ -2482,106 +2506,119 @@ void CSubcell::voltage_clamp(double t, double peak_v, bool output, double dt, do
 }
 
 
-void CSubcell::allocate_memory_PTM_CaM_vars(int n){
+void CSubcell::allocate_memory_all_PTM_vars(int n){
 
-  RyR_CKp = new double(n);
-  RyR_PKAp = new double(n);
+  // RyR_CKp = new double[n];
+  // RyR_PKAp = new double[n];
   //All Parameters
-  CaMtotDyad = new double(n);
-  BtotDyad = new double(n);
-  CaMKIItotDyad = new double(n);
-  CaNtotDyad = new double(n);
-  PP1totDyad = new double(n);
-  CaMtotSL = new double(n);
-  BtotSL = new double(n);
-  CaMKIItotSL = new double(n);
-  CaNtotSL = new double(n);
-  PP1totSL = new double(n);
-  CaMtotCyt = new double(n);
-  BtotCyt = new double(n);
-  CaMKIItotCyt = new double(n);
-  CaNtotCyt = new double(n);
-  PP1totCyt = new double(n);
-  LCCtotDyad = new double(n);
-  RyRtot = new double(n);
-  PP1_dyad = new double(n);
-  PP2A_dyad = new double(n);
-  OA = new double(n);
-  LCCtotSL = new double(n);
-  PP1_SL = new double(n);
-  PLBtot = new double(n);
-  Ligtot = new double(n);
-  LCCtotBA = new double(n);
-  RyRtotBA = new double(n);
-  PLBtotBA = new double(n);
-  TnItotBA = new double(n);
-  IKstotBA = new double(n);
-  ICFTRtotBA = new double(n);
-  PP1_PLBtot = new double(n);
-  PLMtotBA = new double(n);
-  MyototBA = new double(n);
-  IKrtotBA = new double(n);
-  IClCatotBA = new double(n);
-  CKIIOE = new double(n);
-  recoveryTime = new double(n);
+  CaMtotDyad = new double[n];
+  BtotDyad = new double[n];
+  CaMKIItotDyad = new double[n];
+  CaNtotDyad = new double[n];
+  PP1totDyad = new double[n];
+  CaMtotSL = new double[n];
+  BtotSL = new double[n];
+  CaMKIItotSL = new double[n];
+  CaNtotSL = new double[n];
+  PP1totSL = new double[n];
+  CaMtotCyt = new double[n];
+  BtotCyt = new double[n];
+  CaMKIItotCyt = new double[n];
+  CaNtotCyt = new double[n];
+  PP1totCyt = new double[n];
+  LCCtotDyad = new double[n];
+  RyRtot = new double[n];
+  PP1_dyad = new double[n];
+  PP2A_dyad = new double[n];
+  OA = new double[n];
+  LCCtotSL = new double[n];
+  PP1_SL = new double[n];
+  PLBtot = new double[n];
+  Ligtot = new double[n];
+  LCCtotBA = new double[n];
+  RyRtotBA = new double[n];
+  PLBtotBA = new double[n];
+  TnItotBA = new double[n];
+  IKstotBA = new double[n];
+  ICFTRtotBA = new double[n];
+  PP1_PLBtot = new double[n];
+  PLMtotBA = new double[n];
+  MyototBA = new double[n];
+  IKrtotBA = new double[n];
+  IClCatotBA = new double[n];
+  CKIIOE = new double[n];
+  recoveryTime = new double[n];
 
   ////CaM State Variables
 
   //Ca Fluxes from CaM
-  JCaCyt = new double(n);
-  JCaSL = new double(n);
-  JCaDyad = new double(n);
+  JCaCyt = new double[n];
+  JCaSL = new double[n];
+  JCaDyad = new double[n];
 
   //CaM_Dyad
-  CaM_dyad = new double(n);
-  Ca2CaM_dyad = new double(n);
-  Ca4CaM_dyad = new double(n);
-  CaMB_dyad = new double(n);
-  Ca2CaMB_dyad = new double(n);
-  Ca4CaMB_dyad = new double(n);
-  Pb2_dyad = new double(n);
-  Pb_dyad = new double(n);
-  Pt_dyad = new double(n);
-  Pt2_dyad = new double(n);
-  Pa_dyad = new double(n);
-  Ca4CaN_dyad = new double(n);
-  CaMCa4CaN_dyad = new double(n);
-  Ca2CaMCa4CaN_dyad = new double(n);
-  Ca4CaMCa4CaN_dyad = new double(n);
+  CaM_dyad = new double[n];
+  Ca2CaM_dyad = new double[n];
+  Ca4CaM_dyad = new double[n];
+  CaMB_dyad = new double[n];
+  Ca2CaMB_dyad = new double[n];
+  Ca4CaMB_dyad = new double[n];
+  Pb2_dyad = new double[n];
+  Pb_dyad = new double[n];
+  Pt_dyad = new double[n];
+  Pt2_dyad = new double[n];
+  Pa_dyad = new double[n];
+  Ca4CaN_dyad = new double[n];
+  CaMCa4CaN_dyad = new double[n];
+  Ca2CaMCa4CaN_dyad = new double[n];
+  Ca4CaMCa4CaN_dyad = new double[n];
 
   //CaM_SL
-  CaM_sl = new double(n);
-  Ca2CaM_sl = new double(n);
-  Ca4CaM_sl = new double(n);
-  CaMB_sl = new double(n);
-  Ca2CaMB_sl = new double(n);
-  Ca4CaMB_sl = new double(n);
-  Pb2_sl = new double(n);
-  Pb_sl = new double(n);
-  Pt_sl = new double(n);
-  Pt2_sl = new double(n);
-  Pa_sl = new double(n);
-  Ca4CaN_sl = new double(n);
-  CaMCa4CaN_sl = new double(n);
-  Ca2CaMCa4CaN_sl = new double(n);
-  Ca4CaMCa4CaN_sl = new double(n);
+  CaM_sl = new double[n];
+  Ca2CaM_sl = new double[n];
+  Ca4CaM_sl = new double[n];
+  CaMB_sl = new double[n];
+  Ca2CaMB_sl = new double[n];
+  Ca4CaMB_sl = new double[n];
+  Pb2_sl = new double[n];
+  Pb_sl = new double[n];
+  Pt_sl = new double[n];
+  Pt2_sl = new double[n];
+  Pa_sl = new double[n];
+  Ca4CaN_sl = new double[n];
+  CaMCa4CaN_sl = new double[n];
+  Ca2CaMCa4CaN_sl = new double[n];
+  Ca4CaMCa4CaN_sl = new double[n];
 
   //CaM_cytosol
-  CaM_cyt = new double(n);
-  Ca2CaM_cyt = new double(n);
-  Ca4CaM_cyt = new double(n);
-  CaMB_cyt = new double(n);
-  Ca2CaMB_cyt = new double(n);
-  Ca4CaMB_cyt = new double(n);
-  Pb2_cyt = new double(n);
-  Pb_cyt = new double(n);
-  Pt_cyt = new double(n);
-  Pt2_cyt = new double(n);
-  Pa_cyt = new double(n);
-  Ca4CaN_cyt = new double(n);
-  CaMCa4CaN_cyt = new double(n);
-  Ca2CaMCa4CaN_cyt = new double(n);
-  Ca4CaMCa4CaN_cyt = new double(n);
+  CaM_cyt = new double[n];
+  Ca2CaM_cyt = new double[n];
+  Ca4CaM_cyt = new double[n];
+  CaMB_cyt = new double[n];
+  Ca2CaMB_cyt = new double[n];
+  Ca4CaMB_cyt = new double[n];
+  Pb2_cyt = new double[n];
+  Pb_cyt = new double[n];
+  Pt_cyt = new double[n];
+  Pt2_cyt = new double[n];
+  Pa_cyt = new double[n];
+  Ca4CaN_cyt = new double[n];
+  CaMCa4CaN_cyt = new double[n];
+  Ca2CaMCa4CaN_cyt = new double[n];
+  Ca4CaMCa4CaN_cyt = new double[n];
+
+  // //CaMKII// //
+  
+  CaMKIIactDyad = new double[n]; 
+  CaMKIIactSL = new double[n];
+  PP1_PLB_avail = new double[n];
+
+  LCC_PKAp = new double[n];
+  LCC_CKdyadp = new double[n];
+  LCC_CKslp = new double[n];
+  RyR2809p = new double[n];
+  RyR2815p = new double[n];
+  PLBT17p = new double[n];
 }
 
 
@@ -2659,8 +2696,7 @@ void CSubcell::calc_dydt_CaM_ODEs(
   //CaM State Variables
   double& Ca2CaM, double& Ca4CaM, double& CaMB, double& Ca2CaMB, double& Ca4CaMB,
   double& Pb2, double& Pb, double& Pt, double& Pt2, double& Pa,
-  double& CaMCaN, double& Ca2CaMCaN, double& Ca4CaMCaN, double& CaM,
-  double& Ca4CaN, double& CaMCa4CaN, double& Ca2CaMCa4CaN, double& Ca4CaMCa4CaN,
+  double& CaM, double& Ca4CaN, double& CaMCa4CaN, double& Ca2CaMCa4CaN, double& Ca4CaMCa4CaN,
 
   //CaM Parameters 
   double CaMtot, double Btot, double CaMKIItot, double CaNtot, double PP1tot, double Ca, 
@@ -2831,7 +2867,6 @@ void CSubcell::calc_dydt_CaM_ODEs(
 
 
 void CSubcell::solve_ODE_CaM(int id, double dt, double* dydt_CaM, int CaM_compartment){
-  int n_CaM_params = 15;
   // double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
   //CaM Cytosol
   if(CaM_compartment == 0){
@@ -2888,14 +2923,132 @@ void CSubcell::solve_ODE_CaM(int id, double dt, double* dydt_CaM, int CaM_compar
     Ca4CaMCa4CaN_dyad[id] += dydt_CaM[14]*dt;
   }
   else{
-    std::cout << "Error: Unreognized CaM_compartment in solve_ODE_CaM: " << CaM_compartment << std::endl;
+    std::cout << "Error: Unrecognized CaM_compartment in solve_ODE_CaM: " << CaM_compartment << std::endl;
     exit(0);
   }
 }
 
 
+void CSubcell::calc_dydt_CaMKII_ODEs(
+  int id, double* dydt_CaMKII,
 
+  //CaMKII State Variables
+  double& LCC_PKAp, double& LCC_CKdyadp, double& LCC_CKslp,
+  double& RyR2809p, double& RyR2815p, 
+  double& PLBT17p,
 
+   //CaMKII Parameters
+  double CaMKIIactDyad, double LCCtotDyad,
+  double RyRtot, double PP1_dyad, double PP2A_dyad,
+  double OA, double PLBtot, double CaMKIIactSL, 
+  double LCCtotSL, double PP1_SL, double PP1_PLB_avail
+  )
+  {
+  //// Description of state variables
+  // LCCp-PKA = y(1);        // [LCCp] by PKA (currently unused anywhere else)
+  // LCCp-CaMKIIdyad = y(2); // Dyadic [LCCp] by dyadic CaMKII
+  // RyR-Ser2809p = y(3);    // [RyR-Ser2809p] by PKA (currently unused anywhere else)
+  // RyR-Ser2815p = y(4);    // [RyR-Ser2815p] by CaMKII 
+  // PLB-Thr17p = y(5);      // [PLB-Thr17p] by CaMKII
+  // LCCp-CaMKIIsl = y(6);   // Subsarcolemmal [LCCp] by subsarcolemmal CaMKII
+  //// RATE CONSTANTS and KM VALUES
+  // L-Type Ca Channel (LCC) parameters
+  double k_ckLCC = 0.4;                  // [s^-1]
+  double k_pp1LCC = 0.1103;              // [s^-1] 
+  double k_pkaLCC = 13.5;                // [s^-1] 
+  double k_pp2aLCC = 10.1;               // [s^-1] 
+
+  double KmCK_LCC = 12;                  // [uM] 
+  double KmPKA_LCC = 21;                 // [uM] 
+  double KmPP2A_LCC = 47;                // [uM] 
+  double KmPP1_LCC = 9;                  // [uM] 
+
+  // Ryanodine Receptor (RyR) parameters
+  double k_ckRyR = 0.4;                  // [s^-1] 
+  double k_pkaRyR = 1.35;                // [s^-1] 
+  double k_pp1RyR = 1.07;                // [s^-1] 
+  double k_pp2aRyR = 0.481;              // [s^-1] 
+
+  // Basal RyR phosphorylation (numbers based on param estimation)
+  double kb_2809 = 0.51;                 // [uM/s] - PKA site
+  double kb_2815 = 0.35;                 // [uM/s] - CaMKII site
+
+  double KmCK_RyR = 12;                  // [uM] 
+  double KmPKA_RyR = 21;                 // [uM] 
+  double KmPP1_RyR = 9;                  // [uM] 
+  double KmPP2A_RyR = 47;                // [uM] 
+
+  // Phospholamban (PLB) parameters
+  double k_ckPLB = 8e-3;                 // [s^-1]
+  double k_pp1PLB = .0428;               // [s^-1]
+
+  double KmCK_PLB = 12;
+  double KmPP1_PLB = 9;
+
+  // Okadaic Acid inhibition params (based on Huke/Bers [2008])
+  // Want to treat OA as non-competitive inhibitor of PP1 and PP2A
+  double Ki_OA_PP1 = 0.78;        // [uM] - Values from fit
+  double Ki_OA_PP2A = 0.037;      // [uM] - Values from fit
+
+  // Default PKA level
+  double PKAc = 95.6*.54;
+
+  //// OA inhibition term (non-competitive) for PP1 and PP2A
+  double OA_PP1 = 1/(1 + pow(OA/Ki_OA_PP1,3));
+  double OA_PP2A = 1/(1 + pow(OA/Ki_OA_PP2A,3));
+
+  //// ODE EQUATIONS
+  //// LCC states (note: PP2A is acting on PKA site and PP1 on CKII site)
+  // CaMKII phosphorylation of Dyadic LCCs
+  double LCC_CKdyadn = LCCtotDyad - LCC_CKdyadp;
+  double LCCDyad_PHOS = (k_ckLCC*CaMKIIactDyad*LCC_CKdyadn)/(KmCK_LCC+LCC_CKdyadn);
+  double LCCDyad_DEPHOS = (k_pp1LCC*PP1_dyad*LCC_CKdyadp)/(KmPP1_LCC+LCC_CKdyadp)*OA_PP1;
+  double dLCC_CKdyadp = LCCDyad_PHOS - LCCDyad_DEPHOS;
+
+  // CaMKII phosphorylation of Sub-sarcolemmal LCCs
+  double LCC_CKsln = LCCtotSL - LCC_CKslp;
+  double LCCSL_PHOS = (k_ckLCC*CaMKIIactSL*LCC_CKsln)/(KmCK_LCC+LCC_CKsln); 
+  double LCCSL_DEPHOS = (k_pp1LCC*PP1_SL*LCC_CKslp)/(KmPP1_LCC+LCC_CKslp)*OA_PP1;
+  double dLCC_CKslp = LCCSL_PHOS - LCCSL_DEPHOS; 
+
+  // PKA phosphorylation (currently unused elsewhere)
+  double LCC_PKAn = LCCtotDyad - LCC_PKAp;
+  double dLCC_PKAp = (k_pkaLCC*PKAc*LCC_PKAn)/(KmPKA_LCC+LCC_PKAn) - 
+              (k_pp2aLCC*PP2A_dyad*LCC_PKAp)/(KmPP2A_LCC+LCC_PKAp)*OA_PP2A;
+  //// RyR states
+  double RyR2815n = RyRtot - RyR2815p;
+  double RyR_BASAL = kb_2815*RyR2815n;
+  double RyR_PHOS = (k_ckRyR*CaMKIIactDyad*RyR2815n)/(KmCK_RyR+RyR2815n);
+  double RyR_PP1_DEPHOS = (k_pp1RyR*PP1_dyad*RyR2815p)/(KmPP1_RyR+RyR2815p)*OA_PP1;
+  double RyR_PP2A_DEPHOS = (k_pp2aRyR*PP2A_dyad*RyR2815p)/(KmPP2A_RyR+RyR2815p)*OA_PP2A;
+  double dRyR2815p = RyR_BASAL + RyR_PHOS - RyR_PP1_DEPHOS - RyR_PP2A_DEPHOS;
+
+  // PKA phosphorylation of Ser 2809 on RyR (currently unused elsewhere)
+  double RyR2809n = RyRtot - RyR2809p;
+  double dRyR2809p = kb_2809*RyR2809n + (k_pkaRyR*PKAc*RyR2809n)/(KmPKA_RyR+RyR2809n) - 
+              (k_pp1RyR*PP1_dyad*RyR2809p)/(KmPP1_RyR+RyR2809p)*OA_PP1;        
+  //// PLB states
+  double PP1_PLB = PP1_dyad*PP1_PLB_avail;    // Inhibitor-1 regulation of PP1_dyad included here
+  double PLBT17n = PLBtot - PLBT17p;
+  double PLB_PHOS = (k_ckPLB*PLBT17n*CaMKIIactDyad)/(KmCK_PLB+PLBT17n);
+  double PLB_DEPHOS = (k_pp1PLB*PP1_PLB*PLBT17p)/(KmPP1_PLB+PLBT17p)*OA_PP1;
+  double dPLBT17p = PLB_PHOS - PLB_DEPHOS; 
+
+  //// Collect ODEs and convert to uM/ms
+  double dydt[]={dLCC_PKAp*10e-3, dLCC_CKdyadp*10e-3, dRyR2809p*10e-3, dRyR2815p*10e-3,dPLBT17p*10e-3, dLCC_CKslp*10e-3};  // Convert to uM/ms
+
+  dydt_CaMKII = dydt;
+
+}
+
+void CSubcell::solve_ODE_CaMKII(int id, double dt, double* dydt_CaMKII){
+  LCC_PKAp[id] += dydt_CaMKII[0]*dt;
+  LCC_CKdyadp[id] += dydt_CaMKII[1]*dt;
+  RyR2809p[id] += dydt_CaMKII[2]*dt;
+  RyR2815p[id] += dydt_CaMKII[3]*dt;
+  PLBT17p[id] += dydt_CaMKII[4]*dt;
+  LCC_CKslp[id] += dydt_CaMKII[5]*dt;
+}
 
 
 
