@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
     prevavecp[i] = 0;
   }
 
-  int num_sims = 10;
+  int num_sims = 30;
   for (int itr = 0; itr < num_sims; itr++) {
     cout << itr << endl;
 

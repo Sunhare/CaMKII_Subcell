@@ -1,7 +1,8 @@
 DEF= -DCPU -D___PERIODIC -D___SIGMOID -D___NCX -D___KOSRCA -D___PTM
 
 CXX=g++
-CXXFLAGS=-O3 -fopenmp
+# CXXFLAGS=-O3 -fopenmp
+CXXFLAGS=-O3
 
 
 SRC_DIR := ./lib
@@ -18,3 +19,4 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc
 
 clean: 
 	rm $(OBJ_FILES) uc
+	mv slurm*.out ./slurms

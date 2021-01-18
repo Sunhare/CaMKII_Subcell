@@ -12,6 +12,9 @@ const double CSubcell::vp_ave=0.00126;
 
 // #include "diffusion.cc"
 
+#define WT 0
+#define OE 1
+#define KO 2
 
 inline unsigned int xorshift(unsigned int *xx, unsigned int *yy, unsigned int *zz, unsigned int *ww)
 {
@@ -161,6 +164,7 @@ void CSubcell::init(double initci, double initcj)
 
   #ifdef ___PTM
     allocate_memory_all_PTM_vars(n);
+    init_const_parameters_PTM();
   #endif 
 
   #ifdef ___DETERMINISTIC
@@ -235,16 +239,16 @@ void CSubcell::init(double initci, double initcj)
       cnsr[id]=initcj;
       Icnsr[id]=0;
 
+  #ifdef ___PTM
+      init_state_variables_PTMs(id);
+  #endif
+
   #ifdef ___NO_CS_BUFFER
       csmn[id]=0;
   #else
       Ics[id]=0;
       Idps[id]=0;
   #endif
-
-  #ifdef ___PTM
-    init_parameters_PTM_CaM(id);
-  #endif 
 
       Ici[id]=0;
 
@@ -329,6 +333,7 @@ CSubcell::~CSubcell()
     delarray();
   }
 }
+//TODO Delete all arrays
 void CSubcell::delarray(void)
 {
   delete [] ci;
@@ -815,12 +820,22 @@ void CSubcell::pace(double v, double nai)
     // }
 
     //Soltis Saucerman PTM 
-    //0 < RyR_CKP < 1
-    //0 < RYR_PKAp < 1
+
     double fCKII_RyR = (20 * RyR_CKp[id] / 3.0 - 1 / 3.0); //≈ 1.0005, Max = 19/3, 6
-    double fPKA_RyR = RyR_PKAp[id] * 1.025 + 0.9750; //1.025*0.025 + 0.9750= 1.00065, Max = 2
+    // double fPKA_RyR = RyR_PKAp[id] * 1.025 + 0.9750; //1.025*0.025 + 0.9750= 1.00065, Max = 2
+    double fPKA_RyR = 1; //Not implemented B-AR module yet TODO
+
+    
+    // if(id%200==0){
+      // std::cout << id << ": RyR2815p: " << RyR2815p[id] << std::endl;
+      // std::cout << id << ": RyR_CKp: " << RyR_CKp[id] << std::endl;
+      // std::cout << id << ": fCKII_RYR: " << fCKII_RyR << std::endl;
+      // std::cout << std::endl;
+    // }
+
     k12 *= (fCKII_RyR + fPKA_RyR - 1); //*= 1.0005, Max 7
     k43 *= (fCKII_RyR + fPKA_RyR - 1); // Max 7
+
 
 #endif
 
@@ -970,73 +985,34 @@ void CSubcell::pace(double v, double nai)
   //Main PTM ODEs
 #ifdef ___PTM
 
-  //CaM Equations
-    //CaM Dyad
-    double* dydt_CaMDyad;
-    dydt_CaMDyad = calc_dydt_CaM_ODEs(id, dydt_CaMDyad,
-      //CaM Dyad/Cleft State Variables
-      Ca2CaM_dyad[id],Ca4CaM_dyad[id],CaMB_dyad[id],Ca2CaMB_dyad[id],Ca4CaMB_dyad[id],
-      Pb2_dyad[id],Pb_dyad[id],Pt_dyad[id],Pt2_dyad[id],Pa_dyad[id],
-      CaM_dyad[id],Ca4CaN_dyad[id], CaMCa4CaN_dyad[id],Ca2CaMCa4CaN_dyad[id],Ca4CaMCa4CaN_dyad[id],
+  //CaM_dyad Equations
+    //CaM_dyad Dyad
+    calc_dydt_CaM_Dyad_ODEs(id);
 
+    //CaM_dyad SL
+    calc_dydt_CaM_SL_ODEs(id);
 
-      //CaM Dyad/Cleft Parameters
-      CaMtotDyad[id],BtotDyad[id],CaMKIItotDyad[id],CaNtotDyad[id],PP1totDyad[id],cp[id], 2);
+    //CaM_dyad Cytosol
+    calc_dydt_CaM_Cyt_ODEs(id);
 
-    //CaM SL
-    double* dydt_CaMSL;
-    dydt_CaMSL = calc_dydt_CaM_ODEs(id, dydt_CaMSL,
-      //CaM Sarcolemmal State Variables
-      Ca2CaM_sl[id],Ca4CaM_sl[id],CaMB_sl[id],Ca2CaMB_sl[id],Ca4CaMB_sl[id],
-      Pb2_sl[id],Pb_sl[id],Pt_sl[id],Pt2_sl[id],Pa_sl[id],
-      CaM_sl[id],Ca4CaN_sl[id], CaMCa4CaN_sl[id],Ca2CaMCa4CaN_sl[id],Ca4CaMCa4CaN_sl[id],
-
-
-      //CaM Sarcolemmal Parameters
-      CaMtotSL[id],BtotSL[id],CaMKIItotSL[id],CaNtotSL[id],PP1totSL[id],cs[id], 1);
-
-    //CaM Cytosol
-    double* dydt_CaMCyt;
-    dydt_CaMCyt = calc_dydt_CaM_ODEs(id, dydt_CaMCyt,
-      //CaM Cytosol State Variables
-      Ca2CaM_cyt[id],Ca4CaM_cyt[id],CaMB_cyt[id],Ca2CaMB_cyt[id],Ca4CaMB_cyt[id],
-      Pb2_cyt[id],Pb_cyt[id],Pt_cyt[id],Pt2_cyt[id],Pa_cyt[id],
-      CaM_cyt[id],Ca4CaN_cyt[id], CaMCa4CaN_cyt[id],Ca2CaMCa4CaN_cyt[id],Ca4CaMCa4CaN_cyt[id],
-
-
-      //CaM Cytosol Parameters
-      CaMtotCyt[id],BtotCyt[id],CaMKIItotCyt[id],CaNtotCyt[id],PP1totCyt[id],ci[id], 0);
-
-    solve_ODE_CaM(id, dt, dydt_CaMDyad, 2);
-    solve_ODE_CaM(id, dt, dydt_CaMSL, 1);
-    solve_ODE_CaM(id, dt, dydt_CaMCyt, 0);
 
   //CaMKII Equations
-    CaMKIIactDyad[id] = CaMKIItotDyad[id]*(Pb_dyad[id]+Pt_dyad[id]+Pt2_dyad[id]+Pa_dyad[id]); // Multiply total by fraction
-    CaMKIIactSL[id] = CaMKIItotSL[id]*(Pb_sl[id]+Pt_sl[id]+Pt2_sl[id]+Pa_sl[id]);
+    CaMKIIactDyad[id] = CaMKIItotDyad*(Pb_dyad[id]+Pt_dyad[id]+Pt2_dyad[id]+Pa_dyad[id]); // Multiply total by fraction of activated CaMKII states (Pb, Pt, Pt2, Pa)
+    CaMKIIactSL[id] = CaMKIItotSL*(Pb_sl[id]+Pt_sl[id]+Pt2_sl[id]+Pa_sl[id]);
 
     //Original
-    // PP1_PLB_avail[id] = y(83+6+45+6+22)./PP1_PLBtot + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
+    // PP1_PLB_avail[id] = y(83+6+45+6+22)/PP1_PLBtot + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
     
     //TODO: PLACEHOLDER, y(83+6+45+6+22) depends on the B-AR module which is not implemented
-    PP1_PLB_avail[id] = 0.8819/PP1_PLBtot[id] + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
+    PP1_PLB_avail[id] = 0.8819/PP1_PLBtot + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
 
-    double* dydt_CaMKII;
-    calc_dydt_CaMKII_ODEs(
-      id, dydt_CaMKII
-      //CaMKII State Variables
-      LCC_PKAp[id], LCC_CKdyadp[id], LCC_CKslp[id],
-      RyR2809p[id], RyR2815p[id], 
-      PLBT17p[id],
-
-      //CaMKII Parameters
-      CaMKIIactDyad[id], LCCtotDyad[id],
-      RyRtot[id], PP1_dyad[id], PP2A_dyad[id],
-      OA[id], PLBtot[id], CaMKIIactSL[id], 
-      LCCtotSL[id], PP1_SL[id], PP1_PLB_avail[id]
-    );
-
-    solve_ODE_CaMKII(id, dt, dydt_CaMKII);
+    calc_dydt_CaMKII_ODEs(id);
+    LCC_CKdyadp[id] = LCC_CKdyadp[id]/LCCtotDyad;   //136 fractional CaMKII-dependent LCC dyad phosphorylation
+    RyR_CKp[id] = RyR2815p[id]/RyRtot;           //138 fractional CaMKII-dependent RyR phosphorylation
+    PLB_CKp[id] = PLBT17p[id]/PLBtot;           //139 fractional CaMKII-dependent PLB phosphorylation
+    
+    solve_ODE_CaM(id);
+    solve_ODE_CaMKII(id);
 
 #endif
 
@@ -2460,10 +2436,10 @@ void CSubcell::printsc0d(double t, double v,std::string filename){
 
   results0d << t << "\t" 
             << v << "\t" 
-            << this->computeaveci() << "\t" 
-            << this->calcjcalave() << "\t" 
-            << this->icaave << "\t"
-            << this->calcjnacaave() << "\t"
+            << computeaveci() << "\t" 
+            << calcjcalave() << "\t" 
+            << icaave << "\t"
+            << calcjnacaave() << "\t"
 
             //SR Ca concentration
             //SR Release
@@ -2505,53 +2481,62 @@ void CSubcell::voltage_clamp(double t, double peak_v, bool output, double dt, do
 
 }
 
-
+#ifdef ___PTM
 void CSubcell::allocate_memory_all_PTM_vars(int n){
+  //TODO
+  // std::cout <<"ENTERED allocate memory all PTM_vars" << std::endl;
 
   // RyR_CKp = new double[n];
   // RyR_PKAp = new double[n];
   //All Parameters
-  CaMtotDyad = new double[n];
-  BtotDyad = new double[n];
-  CaMKIItotDyad = new double[n];
-  CaNtotDyad = new double[n];
-  PP1totDyad = new double[n];
-  CaMtotSL = new double[n];
-  BtotSL = new double[n];
-  CaMKIItotSL = new double[n];
-  CaNtotSL = new double[n];
-  PP1totSL = new double[n];
-  CaMtotCyt = new double[n];
-  BtotCyt = new double[n];
-  CaMKIItotCyt = new double[n];
-  CaNtotCyt = new double[n];
-  PP1totCyt = new double[n];
-  LCCtotDyad = new double[n];
-  RyRtot = new double[n];
-  PP1_dyad = new double[n];
-  PP2A_dyad = new double[n];
-  OA = new double[n];
-  LCCtotSL = new double[n];
-  PP1_SL = new double[n];
-  PLBtot = new double[n];
-  Ligtot = new double[n];
-  LCCtotBA = new double[n];
-  RyRtotBA = new double[n];
-  PLBtotBA = new double[n];
-  TnItotBA = new double[n];
-  IKstotBA = new double[n];
-  ICFTRtotBA = new double[n];
-  PP1_PLBtot = new double[n];
-  PLMtotBA = new double[n];
-  MyototBA = new double[n];
-  IKrtotBA = new double[n];
-  IClCatotBA = new double[n];
-  CKIIOE = new double[n];
-  recoveryTime = new double[n];
 
-  ////CaM State Variables
 
-  //Ca Fluxes from CaM
+  // CaMtotDyad = new double[n];
+  // BtotDyad = new double[n];
+  // CaMKIItotDyad = new double[n];
+  // CaNtotDyad = new double[n];
+  // PP1totDyad = new double[n];
+  // CaMtotSL = new double[n];
+  // BtotSL = new double[n];
+  // CaMKIItotSL = new double[n];
+  // CaNtotSL = new double[n];
+  // PP1totSL = new double[n];
+  // CaMtotCyt = new double[n];
+  // BtotCyt = new double[n];
+  // CaMKIItotCyt = new double[n];
+  // CaNtotCyt = new double[n];
+  // PP1totCyt = new double[n];
+  // LCCtotDyad = new double[n];
+  // RyRtot = new double[n];
+  // PP1_dyad = new double[n];
+  // PP2A_dyad = new double[n];
+  // OA = new double[n];
+  // LCCtotSL = new double[n];
+  // PP1_SL = new double[n];
+  // PLBtot = new double[n];
+  // Ligtot = new double[n];
+  // LCCtotBA = new double[n];
+  // RyRtotBA = new double[n];
+  // PLBtotBA = new double[n];
+  // TnItotBA = new double[n];
+  // IKstotBA = new double[n];
+  // ICFTRtotBA = new double[n];
+  // PP1_PLBtot = new double[n];
+  // PLMtotBA = new double[n];
+  // MyototBA = new double[n];
+  // IKrtotBA = new double[n];
+  // IClCatotBA = new double[n];
+  // CKIIOE = new double[n];
+  // recoveryTime = new double[n];
+
+  //CaM Differentials
+  dydt_CaMDyad = new double[15];
+  dydt_CaMSL = new double[15];
+  dydt_CaMCyt = new double[15];
+  dydt_CaMKII = new double[6];
+
+  //CaM State Variables
+  //Ca Fluxes from CaM_dyad
   JCaCyt = new double[n];
   JCaSL = new double[n];
   JCaDyad = new double[n];
@@ -2619,116 +2604,188 @@ void CSubcell::allocate_memory_all_PTM_vars(int n){
   RyR2809p = new double[n];
   RyR2815p = new double[n];
   PLBT17p = new double[n];
+
+
+  // LCC_CKdyadp = new double[n]; //Defined twice?
+  RyR_CKp = new double[n];
+  PLB_CKp = new double[n];
+  // std::cout <<"EXITED allocate memory all PTM_vars" << std::endl;
 }
 
 
-void CSubcell::init_parameters_PTM_CaM(int n){
+
+
+void CSubcell::init_const_parameters_PTM(){
   // freq = 1.0;                 // [Hz] CHANGE DEPENDING ON FREQUENCY
   // cycleLength = 1e3/freq;     // [ms]
-  CaMtotDyad[n] = 418;             //[uM]
-  BtotDyad[n] = 1.54/8.293e-4;        //[uM]
-  CaMKIItotDyad[n] = 120;        //[uM]
-  CaNtotDyad[n] = 3e-3/8.293e-4;    //[uM]
-  PP1totDyad[n] = 96.5;             //[uM]
-  CaMtotSL[n] = 5.65;                 //[uM]
-  BtotSL[n] = 24.2;                     //[uM]
-  CaMKIItotSL[n] = 120*8.293e-4;   //[uM]
-  CaNtotSL[n] = 3e-3;                 //[uM]
-  PP1totSL[n] = 0.57;                 //[uM]
-  CaMtotCyt[n] = 5.65;               //[uM]
-  BtotCyt[n] = 24.2;                   //[uM]
-  CaMKIItotCyt[n] = 120*8.293e-4; //[uM]
-  CaNtotCyt[n] = 3e-3;               //[uM]
-  PP1totCyt[n] = 0.57;               //[uM]
+  CaMtotDyad = 418;             //[uM]
+  BtotDyad = 1.54/8.293e-4;        //[uM]
+  CaMKIItotDyad = 120;        //[uM]
+  CaNtotDyad = 3e-3/8.293e-4;    //[uM]
+  PP1totDyad = 96.5;             //[uM]
+  CaMtotSL = 5.65;                 //[uM]
+  BtotSL = 24.2;                     //[uM]
+  CaMKIItotSL = 120*8.293e-4;   //[uM]
+  CaNtotSL = 3e-3;                 //[uM]
+  PP1totSL = 0.57;                 //[uM]
+  CaMtotCyt = 5.65;               //[uM]
+  BtotCyt = 24.2;                   //[uM]
+  CaMKIItotCyt = 120*8.293e-4; //[uM]
+  CaNtotCyt = 3e-3;               //[uM]
+  PP1totCyt = 0.57;               //[uM]
 
   // ADJUST CAMKII ACTIVITY LEVELS (expression = 'WT', 'OE', or 'KO')
-  expression[n] = (char* )"WT";
-  CKIIOE[n] = 0; // Should be zero during "WT" and "KO" runs
-
-  if(expression[n] =="OE"){
-    CKIIOE[n] = 1; // Flag for CKII OE in ECC file (0=WT, 1=OE) - for Ito and INa
-    CaMKIItotDyad[n] = 120*6;          // [uM] 
-    CaMKIItotSL[n] = 120*8.293e-4*6;   // [uM]
-    CaMKIItotCyt[n] = 120*8.293e-4*6;  // [uM]
+  expression = WT;
+  CKIIOE = 0; // Should be zero during "WT" and "KO" runs
+  if(expression == OE){
+    CKIIOE = 1; // Flag for CKII OE in ECC file (0=WT, 1=OE) - for Ito and INa
+    CaMKIItotDyad = 120*6;          // [uM] 
+    CaMKIItotSL = 120*8.293e-4*6;   // [uM]
+    CaMKIItotCyt = 120*8.293e-4*6;  // [uM]
   }
-  else if(expression[n] == "KO"){
-    CaMKIItotDyad[n] = 0;              // [uM] 
-    CaMKIItotSL[n] = 0;                // [uM]
-    CaMKIItotCyt[n] = 0;               // [uM]
-  }
-  else{
-    expression[n] = (char* )"WT";
+  else if(expression == KO){
+    CaMKIItotDyad = 0;              // [uM] 
+    CaMKIItotSL = 0;                // [uM]
+    CaMKIItotCyt = 0;               // [uM]
   }
 
   // Parameters for CaMKII module
-  LCCtotDyad[n] = 31.4*.9;       // [uM] - Total Dyadic [LCC] - (umol/l dyad)
-  LCCtotSL[n] = 0.0846;          // [uM] - Total Subsarcolemmal [LCC] (umol/l sl)
-  RyRtot[n] = 382.6;             // [uM] - Total RyR (in Dyad)
-  PP1_dyad[n] = 95.7;            // [uM] - Total dyadic [PP1]
-  PP1_SL[n] = 0.57;              // [uM] - Total Subsarcolemmal [PP1]
-  PP2A_dyad[n] = 95.76;          // [uM] - Total dyadic PP2A
-  OA[n] = 0;                     // [uM] - PP1/PP2A inhibitor Okadaic Acid
-  PLBtot[n] = 38;                // [uM] - Total [PLB] in cytosolic units
+  LCCtotDyad = 31.4*.9;       // [uM] - Total Dyadic [LCC] - (umol/l dyad)
+  LCCtotSL = 0.0846;          // [uM] - Total Subsarcolemmal [LCC] (umol/l sl)
+  RyRtot = 382.6;             // [uM] - Total RyR (in Dyad)
+  PP1_dyad = 95.7;            // [uM] - Total dyadic [PP1]
+  PP1_SL = 0.57;              // [uM] - Total Subsarcolemmal [PP1]
+  PP2A_dyad = 95.76;          // [uM] - Total dyadic PP2A
+  OA = 0;                     // [uM] - PP1/PP2A inhibitor Okadaic Acid
+  PLBtot = 38;                // [uM] - Total [PLB] in cytosolic units
 
   // Parameters for BAR module
-  Ligtot[n] = 0;// 0.1 or 0.02    // [uM] - SET LIGAND CONCENTRATION HERE
-  LCCtotBA[n] = 0.025;           // [uM] - [umol/L cytosol]
-  RyRtotBA[n] = 0.135;           // [uM] - [umol/L cytosol]
-  PLBtotBA[n] = PLBtot[n];          // [uM] - [umol/L cytosol]
-  TnItotBA[n] = 70;              // [uM] - [umol/L cytosol]
-  IKstotBA[n] = 0.025;           // [uM] - [umol/L cytosol]
-  ICFTRtotBA[n] = 0.025;         // [uM] - [umol/L cytosol]
-  PP1_PLBtot[n] = 0.89;          // [uM] - [umol/L cytosol]
-  PLMtotBA[n] = 48;              // [uM] - [umol/L cytosol]
-  MyototBA[n] = 70;              // [uM] - [umol/L cytosol]
-  IKrtotBA[n] = 0.025;           // [uM] - [umol/L cytosol]
-  IClCatotBA[n] = 0.025;         // [uM] - [umol/L cytosol]
+  Ligtot = 0;// 0.1 or 0.02    // [uM] - SET LIGAND CONCENTRATION HERE
+  LCCtotBA = 0.025;           // [uM] - [umol/L cytosol]
+  RyRtotBA = 0.135;           // [uM] - [umol/L cytosol]
+  PLBtotBA = PLBtot;          // [uM] - [umol/L cytosol]
+  TnItotBA = 70;              // [uM] - [umol/L cytosol]
+  IKstotBA = 0.025;           // [uM] - [umol/L cytosol]
+  ICFTRtotBA = 0.025;         // [uM] - [umol/L cytosol]
+  PP1_PLBtot = 0.89;          // [uM] - [umol/L cytosol]
+  PLMtotBA = 48;              // [uM] - [umol/L cytosol]
+  MyototBA = 70;              // [uM] - [umol/L cytosol]
+  IKrtotBA = 0.025;           // [uM] - [umol/L cytosol]
+  IClCatotBA = 0.025;         // [uM] - [umol/L cytosol]
 
   // For Recovery from inactivation of LCC
-  recoveryTime[n] = 10;  // initialize to smallest value
-
+  recoveryTime = 10;  // initialize to smallest value
 }
 
 
-  // pCaMDyad = [K, Mg, CaMtotDyad, 0, CaMKIItotDyad, CaNtotDyad, PP1totDyad, CaDyad, cycleLength, compart_dyad];
-void CSubcell::calc_dydt_CaM_ODEs(
-  int id, double* dydt_CaM,
-  //CaM State Variables
-  double& Ca2CaM, double& Ca4CaM, double& CaMB, double& Ca2CaMB, double& Ca4CaMB,
-  double& Pb2, double& Pb, double& Pt, double& Pt2, double& Pa,
-  double& CaM, double& Ca4CaN, double& CaMCa4CaN, double& Ca2CaMCa4CaN, double& Ca4CaMCa4CaN,
+void CSubcell::init_state_variables_PTMs(int id){
+  // double *dydt_CaMDyad, *dydt_CaMSL, *dydt_CaMCyt;
+    // double *JCaCyt, *JCaSL, *JCaDyad;
 
-  //CaM Parameters 
-  double CaMtot, double Btot, double CaMKIItot, double CaNtot, double PP1tot, double Ca, 
-  int CaM_compartment)
+    //CaM_Dyad
+    CaM_dyad[id]= 356.109460603695;
+    Ca2CaM_dyad[id]= 5.97654735341164;
+    Ca4CaM_dyad[id]= 0.00223486677258696;
+    CaMB_dyad[id]= 0;
+    Ca2CaMB_dyad[id]= 0;
+    Ca4CaMB_dyad[id]= 0;
+    Pb2_dyad[id]= 0.527046816424795;
+    Pb_dyad[id]= 0.0328341389969648;
+    Pt_dyad[id]= 7.55606853909437e-06;
+    Pt2_dyad[id]= 2.99351358946522e-09;
+    Pa_dyad[id]= 2.49374553021126e-09;
+    Ca4CaN_dyad[id]= 0.000136542384253690;
+    CaMCa4CaN_dyad[id]= 0.00414331349458221;
+    Ca2CaMCa4CaN_dyad[id]= 0.0125769071945199;
+    Ca4CaMCa4CaN_dyad[id]= 3.60060936227458;
 
-{
+    //CaM_SL
+    
+    CaM_sl[id]= 0.0369987905424850;
+    Ca2CaM_sl[id]= 4.96044557788166e-05;
+    Ca4CaM_sl[id]= 1.25071429861889e-08;
+    CaMB_sl[id]= 1.99877548871130;
+    Ca2CaMB_sl[id]= 13.7576843921400;
+    Ca4CaMB_sl[id]= 0.000294277468518282;
+    Pb2_sl[id]= 1.00823339154849e-05;
+    Pb_sl[id]= 1.49023312731869e-05;
+    Pt_sl[id]= 3.28512350734024e-07;
+    Pt2_sl[id]= 3.56376700614912e-12;
+    Pa_sl[id]= 2.13842749748637e-08;
+    Ca4CaN_sl[id]= 0.000363360135943152;
+    CaMCa4CaN_sl[id]= 1.15201811885199e-06;
+    Ca2CaMCa4CaN_sl[id]= 5.16530421197686e-06;
+    Ca4CaMCa4CaN_sl[id]= 0.00204745211775456;
+
+    //CaM_cytosol
+    CaM_cyt[id]= 0.0367160202068570;
+    Ca2CaM_cyt[id]= 3.48648648558715e-05;
+    Ca4CaM_cyt[id]= 5.72196307711396e-10;
+    CaMB_cyt[id]= 3.50223317045483;
+    Ca2CaMB_cyt[id]= 1.80060664830752;
+    Ca4CaMB_cyt[id]= 2.60549585613380e-05;
+    Pb2_cyt[id]= 6.97710649793748e-06;
+    Pb_cyt[id]= 1.00475277347346e-07;
+    Pt_cyt[id]= 3.78363623175676e-12;
+    Pt2_cyt[id]= 4.03604680784057e-17;
+    Pa_cyt[id]= 2.52209309010385e-13;
+    Ca4CaN_cyt[id]= 0.000201018368785850;
+    CaMCa4CaN_cyt[id]= 6.32018257082229e-07;
+    Ca2CaMCa4CaN_cyt[id]= 3.95696769885873e-07;
+    Ca4CaMCa4CaN_cyt[id]= 7.89429746296487e-06;
+
+  //* * * * * CaM Variables * * * * * 
+
+  //* * * * * CaMKII Variables * * * * *  
+
+    //CaMKII State Variables
+    
+    LCC_PKAp[id] = 16.4544;
+    LCC_CKdyadp[id] = 15.6555;
+    RyR2809p[id] = 297.3572;
+    RyR2815p[id] = 74.9548;
+    PLBT17p[id] = 0.4628;
+    LCC_CKslp[id] = 1.90123528218208e-05;
+
+    CaMKIIactDyad[id] = CaMKIItotDyad*(Pb_dyad[id]+Pt_dyad[id]+Pt2_dyad[id]+Pa_dyad[id]); // Multiply total by fraction of activated CaMKII states (Pb, Pt, Pt2, Pa)
+    CaMKIIactSL[id] = CaMKIItotSL*(Pb_sl[id]+Pt_sl[id]+Pt2_sl[id]+Pa_sl[id]);
+
+    PP1_PLB_avail[id] = 0.8819/PP1_PLBtot + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
+
+    LCC_CKdyadp[id] = LCC_CKdyadp[id]/LCCtotDyad;   //136 fractional CaMKII-dependent LCC dyad phosphorylation
+    RyR_CKp[id] = RyR2815p[id]/RyRtot;           //138 fractional CaMKII-dependent RyR phosphorylation
+    PLB_CKp[id] = PLBT17p[id]/PLBtot; 
+}
+
+
+
+void CSubcell::calc_dydt_CaM_Dyad_ODEs(int id){
   double K = 135; // mM
   double Mg = 1; //mM
 
 
-  // Negroni et al model - CaM module
+  // Negroni et al model - CaM_dyad module
 
   //// Descriptions for state variables
-  // Ca2CaM = y(1);  // 2 Ca bound to C terminal sites
-  // Ca4CaM = y(2);  // 4 Ca bound
-  // CaMB = y(3);   
-  // Ca2CaMB = y(4);
-  // Ca4CaMB = y(5);
-  // Pb2 = y(6);     // probability of a Ca2CaM bound CaMKII subunit
-  // Pb = y(7);      // probability of a Ca4CaM bound CaMKII subunit
-  // Pt = y(8);      // probability of a Ca4CaM bound autophosphorylated CaMKII subunit
-  // Pt2 = y(9);     // probability of a Ca2CaMxx bound autophosphorylated CaMKII subunit
-  // Pa = y(10);     // probability of an autonomous autophosphorylated CaMKII subunit
+  // Ca2CaM_dyad[id] = y(1);  // 2 Ca bound to C terminal sites
+  // Ca4CaM_dyad[id] = y(2);  // 4 Ca bound
+  // CaMB_dyad[id] = y(3);   
+  // Ca2CaMB_dyad[id] = y(4);
+  // Ca4CaMB_dyad[id] = y(5);
+  // Pb2_dyad[id] = y(6);     // probability of a Ca2CaM_dyad[id] bound CaMKII subunit
+  // Pb_dyad[id] = y(7);      // probability of a Ca4CaM_dyad[id] bound CaMKII subunit
+  // Pt_dyad[id] = y(8);      // probability of a Ca4CaM_dyad[id] bound autophosphorylated CaMKII subunit
+  // Pt2_dyad[id] = y(9);     // probability of a Ca2CaMxx bound autophosphorylated CaMKII subunit
+  // Pa_dyad[id] = y(10);     // probability of an autonomous autophosphorylated CaMKII subunit
   // CaMCaN = y(11);
   // Ca2CaMCaN = y(12);
   // Ca4CaMCaN = y(13);  // active calcineurin
   // description of intermediate variables
-  // CaM- Ca free CaM
+  // CaM_dyad- Ca free CaM_dyad
   ////
 
   // Parameters
-  // Ca/CaM parameters
+  // Ca/CaM_dyad parameters
   double Kd02, Kd24;
   if(Mg <= 1){
       Kd02 = 0.0025*(1+K/0.94-Mg/0.012)*(1+K/8.1+Mg/0.022);  // [uM^2]
@@ -2744,7 +2801,7 @@ void CSubcell::calc_dydt_CaM_ODEs(
   double k42 = 500;              // [s^-1]      
   double k24 = k42/Kd24;         // [uM^-2 s^-1]
 
-  // CaM buffering (B) parameters
+  // CaM_dyad buffering (B) parameters
   double k0Boff = 0.0014;        // [s^-1] 
   double k0Bon = k0Boff/0.2;   // [uM^-1 s^-1] kon = koff/Kd
   double k2Boff = k0Boff/100;    // [s^-1] 
@@ -2759,7 +2816,7 @@ void CSubcell::calc_dydt_CaM_ODEs(
 
   // CaMKII parameters
   // Wi Wa Wt Wp
-  double kbi = 2.2;      // [s^-1] (Ca4CaM dissocation from Wb)
+  double kbi = 2.2;      // [s^-1] (Ca4CaM_dyad[id] dissocation from Wb)
   double kib = kbi/33.5e-3; // [uM^-1 s^-1]
   double kib2 = kib;
   double kb2i = kib2*5;
@@ -2767,8 +2824,8 @@ void CSubcell::calc_dydt_CaM_ODEs(
   double kb42 = k42*33.5e-3/5;
   double kpp1 = 1.72;    // [s^-1] (PP1-dep dephosphorylation rates)
   double Kmpp1 = 11.5;   // [uM]
-  double kta = kbi/1000; // [s^-1] (Ca4CaM dissociation from Wt)
-  double kat = kib;      // [uM^-1 s^-1] (Ca4CaM reassociation with Wa)
+  double kta = kbi/1000; // [s^-1] (Ca4CaM_dyad[id] dissociation from Wt)
+  double kat = kib;      // [uM^-1 s^-1] (Ca4CaM_dyad[id] reassociation with Wa)
   double kt42 = k42*33.5e-6/5;
   double kt24 = k24;
   double kat2 = kib;
@@ -2788,164 +2845,428 @@ void CSubcell::calc_dydt_CaM_ODEs(
   double k24can = k24;
   double k42can = k20/2508;
 
-  // CaM Reaction fluxes
-  double rcn02 = k02*pow(Ca,2)*CaM - k20*Ca2CaM;
-  double rcn24 = k24*pow(Ca,2)*Ca2CaM - k42*Ca4CaM;
-  // CaM buffer fluxes
-  double B = Btot - CaMB - Ca2CaMB - Ca4CaMB;
-  double rcn02B = k02B*pow(Ca,2)*CaMB - k20B*Ca2CaMB;
-  double rcn24B = k24B*pow(Ca,2)*Ca2CaMB - k42B*Ca4CaMB;
-  double rcn0B = k0Bon*CaM*B - k0Boff*CaMB;
-  double rcn2B = k2Bon*Ca2CaM*B - k2Boff*Ca2CaMB;
-  double rcn4B = k4Bon*Ca4CaM*B - k4Boff*Ca4CaMB;
+  // CaM_dyad Reaction fluxes
+  double rcn02 = k02*pow(cp[id],2)*CaM_dyad[id] - k20*Ca2CaM_dyad[id];
+  double rcn24 = k24*pow(cp[id],2)*Ca2CaM_dyad[id] - k42*Ca4CaM_dyad[id];
+  // CaM_dyad buffer fluxes
+  double B = BtotDyad - CaMB_dyad[id] - Ca2CaMB_dyad[id] - Ca4CaMB_dyad[id];
+  double rcn02B = k02B*pow(cp[id],2)*CaMB_dyad[id] - k20B*Ca2CaMB_dyad[id];
+  double rcn24B = k24B*pow(cp[id],2)*Ca2CaMB_dyad[id] - k42B*Ca4CaMB_dyad[id];
+  double rcn0B = k0Bon*CaM_dyad[id]*B - k0Boff*CaMB_dyad[id];
+  double rcn2B = k2Bon*Ca2CaM_dyad[id]*B - k2Boff*Ca2CaMB_dyad[id];
+  double rcn4B = k4Bon*Ca4CaM_dyad[id]*B - k4Boff*Ca4CaMB_dyad[id];
   // CaN reaction fluxes 
-  double Ca2CaN = CaNtot - Ca4CaN - CaMCa4CaN - Ca2CaMCa4CaN - Ca4CaMCa4CaN;
-  double rcnCa4CaN = kcanCaon*pow(Ca,2)*Ca2CaN - kcanCaoff*Ca4CaN;
-  double rcn02CaN = k02can*pow(Ca,2)*CaMCa4CaN - k20can*Ca2CaMCa4CaN; 
-  double rcn24CaN = k24can*pow(Ca,2)*Ca2CaMCa4CaN - k42can*Ca4CaMCa4CaN;
-  double rcn0CaN = kcanCaM0on*CaM*Ca4CaN - kcanCaM0off*CaMCa4CaN;
-  double rcn2CaN = kcanCaM2on*Ca2CaM*Ca4CaN - kcanCaM2off*Ca2CaMCa4CaN;
-  double rcn4CaN = kcanCaM4on*Ca4CaM*Ca4CaN - kcanCaM4off*Ca4CaMCa4CaN;
+  double Ca2CaN = CaNtotDyad - Ca4CaN_dyad[id] - CaMCa4CaN_dyad[id] - Ca2CaMCa4CaN_dyad[id] - Ca4CaMCa4CaN_dyad[id];
+  double rcnCa4CaN = kcanCaon*pow(cp[id],2)*Ca2CaN - kcanCaoff*Ca4CaN_dyad[id];
+  double rcn02CaN = k02can*pow(cp[id],2)*CaMCa4CaN_dyad[id] - k20can*Ca2CaMCa4CaN_dyad[id]; 
+  double rcn24CaN = k24can*pow(cp[id],2)*Ca2CaMCa4CaN_dyad[id] - k42can*Ca4CaMCa4CaN_dyad[id];
+  double rcn0CaN = kcanCaM0on*CaM_dyad[id]*Ca4CaN_dyad[id] - kcanCaM0off*CaMCa4CaN_dyad[id];
+  double rcn2CaN = kcanCaM2on*Ca2CaM_dyad[id]*Ca4CaN_dyad[id] - kcanCaM2off*Ca2CaMCa4CaN_dyad[id];
+  double rcn4CaN = kcanCaM4on*Ca4CaM_dyad[id]*Ca4CaN_dyad[id] - kcanCaM4off*Ca4CaMCa4CaN_dyad[id];
   // CaMKII reaction fluxes
-  double Pi = 1 - Pb2 - Pb - Pt - Pt2 - Pa;
-  double rcnCKib2 = kib2*Ca2CaM*Pi - kb2i*Pb2;
-  double rcnCKb2b = kb24*pow(Ca,2)*Pb2 - kb42*Pb;
-  double rcnCKib = kib*Ca4CaM*Pi - kbi*Pb;
-  double T = Pb + Pt + Pt2 + Pa;
+  double Pi = 1 - Pb2_dyad[id] - Pb_dyad[id] - Pt_dyad[id] - Pt2_dyad[id] - Pa_dyad[id];
+  double rcnCKib2 = kib2*Ca2CaM_dyad[id]*Pi - kb2i*Pb2_dyad[id];
+  double rcnCKb2b = kb24*pow(cp[id],2)*Pb2_dyad[id] - kb42*Pb_dyad[id];
+  double rcnCKib = kib*Ca4CaM_dyad[id]*Pi - kbi*Pb_dyad[id];
+  double T = Pb_dyad[id] + Pt_dyad[id] + Pt2_dyad[id] + Pa_dyad[id];
   double kbt = 0.055*T + .0074*pow(T,2) + 0.015*pow(T,3);
-  double rcnCKbt = kbt*Pb - kpp1*PP1tot*Pt/(Kmpp1+CaMKIItot*Pt);
-  double rcnCKtt2 = kt42*Pt - kt24*pow(Ca,2)*Pt2;
-  double rcnCKta = kta*Pt - kat*Ca4CaM*Pa;
-  double rcnCKt2a = kt2a*Pt2 - kat2*Ca2CaM*Pa;
-  double rcnCKt2b2 = kpp1*PP1tot*Pt2/(Kmpp1+CaMKIItot*Pt2);
-  double rcnCKai = kpp1*PP1tot*Pa/(Kmpp1+CaMKIItot*Pa);
+  double rcnCKbt = kbt*Pb_dyad[id] - kpp1*PP1totDyad*Pt_dyad[id]/(Kmpp1+CaMKIItotDyad*Pt_dyad[id]);
+  double rcnCKtt2 = kt42*Pt_dyad[id] - kt24*pow(cp[id],2)*Pt2_dyad[id];
+  double rcnCKta = kta*Pt_dyad[id] - kat*Ca4CaM_dyad[id]*Pa_dyad[id];
+  double rcnCKt2a = kt2a*Pt2_dyad[id] - kat2*Ca2CaM_dyad[id]*Pa_dyad[id];
+  double rcnCKt2b2 = kpp1*PP1totDyad*Pt2_dyad[id]/(Kmpp1+CaMKIItotDyad*Pt2_dyad[id]);
+  double rcnCKai = kpp1*PP1totDyad*Pa_dyad[id]/(Kmpp1+CaMKIItotDyad*Pa_dyad[id]);
 
-  // CaM equations
+  // CaM_dyad equations
   double dCaM = 1e-3*(-rcn02 - rcn0B - rcn0CaN);
-  double dCa2CaM = 1e-3*(rcn02 - rcn24 - rcn2B - rcn2CaN + CaMKIItot*(-rcnCKib2 + rcnCKt2a) );
-  double dCa4CaM = 1e-3*(rcn24 - rcn4B - rcn4CaN + CaMKIItot*(-rcnCKib+rcnCKta) );
+  double dCa2CaM = 1e-3*(rcn02 - rcn24 - rcn2B - rcn2CaN + CaMKIItotDyad*(-rcnCKib2 + rcnCKt2a) );
+  double dCa4CaM = 1e-3*(rcn24 - rcn4B - rcn4CaN + CaMKIItotDyad*(-rcnCKib+rcnCKta) );
   double dCaMB = 1e-3*(rcn0B-rcn02B);
   double dCa2CaMB = 1e-3*(rcn02B + rcn2B - rcn24B);
   double dCa4CaMB = 1e-3*(rcn24B + rcn4B);
 
   // CaMKII equations
-  double dPb2 = 1e-3*(rcnCKib2 - rcnCKb2b + rcnCKt2b2); // Pb2
-  double dPb = 1e-3*(rcnCKib + rcnCKb2b - rcnCKbt);    // Pb
-  double dPt = 1e-3*(rcnCKbt-rcnCKta-rcnCKtt2);        // Pt
-  double dPt2 = 1e-3*(rcnCKtt2-rcnCKt2a-rcnCKt2b2);     // Pt2
-  double dPa = 1e-3*(rcnCKta+rcnCKt2a-rcnCKai);       // Pa
+  double dPb2 = 1e-3*(rcnCKib2 - rcnCKb2b + rcnCKt2b2); // Pb2_dyad[id]
+  double dPb = 1e-3*(rcnCKib + rcnCKb2b - rcnCKbt);    // Pb_dyad[id]
+  double dPt = 1e-3*(rcnCKbt-rcnCKta-rcnCKtt2);        // Pt_dyad[id]
+  double dPt2 = 1e-3*(rcnCKtt2-rcnCKt2a-rcnCKt2b2);     // Pt2_dyad[id]
+  double dPa = 1e-3*(rcnCKta+rcnCKt2a-rcnCKai);       // Pa_dyad[id]
 
   // CaN equations
-  double dCa4CaN = 1e-3*(rcnCa4CaN - rcn0CaN - rcn2CaN - rcn4CaN);                       // Ca4CaN
-  double dCaMCa4CaN = 1e-3*(rcn0CaN - rcn02CaN);           // CaMCa4CaN
-  double dCa2CaMCa4CaN = 1e-3*(rcn2CaN+rcn02CaN-rcn24CaN);    // Ca2CaMCa4CaN
-  double dCa4CaMCa4CaN = 1e-3*(rcn4CaN+rcn24CaN);             // Ca4CaMCa4CaN
+  double dCa4CaN = 1e-3*(rcnCa4CaN - rcn0CaN - rcn2CaN - rcn4CaN);                       // Ca4CaN_dyad[id]
+  double dCaMCa4CaN = 1e-3*(rcn0CaN - rcn02CaN);           // CaMCa4CaN_dyad[id]
+  double dCa2CaMCa4CaN = 1e-3*(rcn2CaN+rcn02CaN-rcn24CaN);    // Ca2CaMCa4CaN_dyad[id]
+  double dCa4CaMCa4CaN = 1e-3*(rcn4CaN+rcn24CaN);             // Ca4CaMCa4CaN_dyad[id]
 
   double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
   
   //Assign dydt
-  dydt_CaM = dydt;
+  dydt_CaMDyad = dydt;
 
-  // write to global variables for adjusting Ca buffering in EC coupling model
-  double JCa = 1e-3*(2*CaMKIItot*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
+  // write to global variables for adjusting Ca dyad buffering in EC coupling model
+  double JCa = 1e-3*(2*CaMKIItotDyad*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
 
-  if(CaM_compartment == 0){
-    JCaCyt[id] = JCa;
-  }
-  else if(CaM_compartment == 1){
-    JCaSL[id] = JCa;
-  }
-  else if(CaM_compartment == 2){
-    JCaDyad[id] = JCa;
+  JCaDyad[id] = JCa;
+}
+void CSubcell::calc_dydt_CaM_SL_ODEs(int id){
+  double K = 135; // mM
+  double Mg = 1; //mM
+
+
+  // Negroni et al model - CaM_sl module
+
+  //// Descriptions for state variables
+  // Ca2CaM_sl[id] = y(1);  // 2 Ca bound to C terminal sites
+  // Ca4CaM_sl[id] = y(2);  // 4 Ca bound
+  // CaMB_sl[id] = y(3);   
+  // Ca2CaMB_sl[id] = y(4);
+  // Ca4CaMB_sl[id] = y(5);
+  // Pb2_sl[id] = y(6);     // probability of a Ca2CaM_sl[id] bound CaMKII subunit
+  // Pb_sl[id] = y(7);      // probability of a Ca4CaM_sl[id] bound CaMKII subunit
+  // Pt_sl[id] = y(8);      // probability of a Ca4CaM_sl[id] bound autophosphorylated CaMKII subunit
+  // Pt2_sl[id] = y(9);     // probability of a Ca2CaMxx bound autophosphorylated CaMKII subunit
+  // Pa_sl[id] = y(10);     // probability of an autonomous autophosphorylated CaMKII subunit
+  // CaMCaN = y(11);
+  // Ca2CaMCaN = y(12);
+  // Ca4CaMCaN = y(13);  // active calcineurin
+  // description of intermediate variables
+  // CaM_sl- Ca free CaM_sl
+  ////
+
+  // Parameters
+  // Ca/CaM_sl parameters
+  double Kd02, Kd24;
+  if(Mg <= 1){
+      Kd02 = 0.0025*(1+K/0.94-Mg/0.012)*(1+K/8.1+Mg/0.022);  // [uM^2]
+      Kd24 = 0.128*(1+K/0.64+Mg/0.0014)*(1+K/13.0-Mg/0.153); // [uM^2]
   }
   else{
-    std::cout <<"Error: Unrecognized CaM_compartment in subcell.cc: " << CaM_compartment << std::endl;
-    std::exit(1);
+      Kd02 = 0.0025*(1+K/0.94-1/0.012+(Mg-1)/0.060)*(1+K/8.1+1/0.022+(Mg-1)/0.068);   // [uM^2]
+      Kd24 = 0.128*(1+K/0.64+1/0.0014+(Mg-1)/0.005)*(1+K/13.0-1/0.153+(Mg-1)/0.150);  // [uM^2]
   }
 
+  double k20 = 10;               // [s^-1]      
+  double k02 = k20/Kd02;         // [uM^-2 s^-1]
+  double k42 = 500;              // [s^-1]      
+  double k24 = k42/Kd24;         // [uM^-2 s^-1]
+
+  // CaM_sl buffering (B) parameters
+  double k0Boff = 0.0014;        // [s^-1] 
+  double k0Bon = k0Boff/0.2;   // [uM^-1 s^-1] kon = koff/Kd
+  double k2Boff = k0Boff/100;    // [s^-1] 
+  double k2Bon = k0Bon;          // [uM^-1 s^-1]
+  double k4Boff = k2Boff;        // [s^-1]
+  double k4Bon = k0Bon;          // [uM^-1 s^-1]
+  // using thermodynamic constraints
+  double k20B = k20/100; // [s^-1] thermo constraint on loop 1
+  double k02B = k02;     // [uM^-2 s^-1] 
+  double k42B = k42;     // [s^-1] thermo constraint on loop 2
+  double k24B = k24;     // [uM^-2 s^-1]
+
+  // CaMKII parameters
+  // Wi Wa Wt Wp
+  double kbi = 2.2;      // [s^-1] (Ca4CaM_sl[id] dissocation from Wb)
+  double kib = kbi/33.5e-3; // [uM^-1 s^-1]
+  double kib2 = kib;
+  double kb2i = kib2*5;
+  double kb24 = k24;
+  double kb42 = k42*33.5e-3/5;
+  double kpp1 = 1.72;    // [s^-1] (PP1-dep dephosphorylation rates)
+  double Kmpp1 = 11.5;   // [uM]
+  double kta = kbi/1000; // [s^-1] (Ca4CaM_sl[id] dissociation from Wt)
+  double kat = kib;      // [uM^-1 s^-1] (Ca4CaM_sl[id] reassociation with Wa)
+  double kt42 = k42*33.5e-6/5;
+  double kt24 = k24;
+  double kat2 = kib;
+  double kt2a = kib*5;
+
+  // CaN parameters
+  double kcanCaoff = 1;              // [s^-1] 
+  double kcanCaon = kcanCaoff/0.5;   // [uM^-1 s^-1] 
+  double kcanCaM4on = 46;            // [uM^-1 s^-1]
+  double kcanCaM4off = 1.3e-3;       // [s^-1]
+  double kcanCaM2on = kcanCaM4on;
+  double kcanCaM2off = 2508*kcanCaM4off;
+  double kcanCaM0on = kcanCaM4on;
+  double kcanCaM0off = 165*kcanCaM2off;
+  double k02can = k02;
+  double k20can = k20/165;
+  double k24can = k24;
+  double k42can = k20/2508;
+
+  // CaM_sl Reaction fluxes
+  double rcn02 = k02*pow(cp[id],2)*CaM_sl[id] - k20*Ca2CaM_sl[id];
+  double rcn24 = k24*pow(cp[id],2)*Ca2CaM_sl[id] - k42*Ca4CaM_sl[id];
+  // CaM_sl buffer fluxes
+  double B = BtotSL - CaMB_sl[id] - Ca2CaMB_sl[id] - Ca4CaMB_sl[id];
+  double rcn02B = k02B*pow(cp[id],2)*CaMB_sl[id] - k20B*Ca2CaMB_sl[id];
+  double rcn24B = k24B*pow(cp[id],2)*Ca2CaMB_sl[id] - k42B*Ca4CaMB_sl[id];
+  double rcn0B = k0Bon*CaM_sl[id]*B - k0Boff*CaMB_sl[id];
+  double rcn2B = k2Bon*Ca2CaM_sl[id]*B - k2Boff*Ca2CaMB_sl[id];
+  double rcn4B = k4Bon*Ca4CaM_sl[id]*B - k4Boff*Ca4CaMB_sl[id];
+  // CaN reaction fluxes 
+  double Ca2CaN = CaNtotSL - Ca4CaN_sl[id] - CaMCa4CaN_sl[id] - Ca2CaMCa4CaN_sl[id] - Ca4CaMCa4CaN_sl[id];
+  double rcnCa4CaN = kcanCaon*pow(cp[id],2)*Ca2CaN - kcanCaoff*Ca4CaN_sl[id];
+  double rcn02CaN = k02can*pow(cp[id],2)*CaMCa4CaN_sl[id] - k20can*Ca2CaMCa4CaN_sl[id]; 
+  double rcn24CaN = k24can*pow(cp[id],2)*Ca2CaMCa4CaN_sl[id] - k42can*Ca4CaMCa4CaN_sl[id];
+  double rcn0CaN = kcanCaM0on*CaM_sl[id]*Ca4CaN_sl[id] - kcanCaM0off*CaMCa4CaN_sl[id];
+  double rcn2CaN = kcanCaM2on*Ca2CaM_sl[id]*Ca4CaN_sl[id] - kcanCaM2off*Ca2CaMCa4CaN_sl[id];
+  double rcn4CaN = kcanCaM4on*Ca4CaM_sl[id]*Ca4CaN_sl[id] - kcanCaM4off*Ca4CaMCa4CaN_sl[id];
+  // CaMKII reaction fluxes
+  double Pi = 1 - Pb2_sl[id] - Pb_sl[id] - Pt_sl[id] - Pt2_sl[id] - Pa_sl[id];
+  double rcnCKib2 = kib2*Ca2CaM_sl[id]*Pi - kb2i*Pb2_sl[id];
+  double rcnCKb2b = kb24*pow(cp[id],2)*Pb2_sl[id] - kb42*Pb_sl[id];
+  double rcnCKib = kib*Ca4CaM_sl[id]*Pi - kbi*Pb_sl[id];
+  double T = Pb_sl[id] + Pt_sl[id] + Pt2_sl[id] + Pa_sl[id];
+  double kbt = 0.055*T + .0074*pow(T,2) + 0.015*pow(T,3);
+  double rcnCKbt = kbt*Pb_sl[id] - kpp1*PP1totSL*Pt_sl[id]/(Kmpp1+CaMKIItotSL*Pt_sl[id]);
+  double rcnCKtt2 = kt42*Pt_sl[id] - kt24*pow(cp[id],2)*Pt2_sl[id];
+  double rcnCKta = kta*Pt_sl[id] - kat*Ca4CaM_sl[id]*Pa_sl[id];
+  double rcnCKt2a = kt2a*Pt2_sl[id] - kat2*Ca2CaM_sl[id]*Pa_sl[id];
+  double rcnCKt2b2 = kpp1*PP1totSL*Pt2_sl[id]/(Kmpp1+CaMKIItotSL*Pt2_sl[id]);
+  double rcnCKai = kpp1*PP1totSL*Pa_sl[id]/(Kmpp1+CaMKIItotSL*Pa_sl[id]);
+
+  // CaM_sl equations
+  double dCaM = 1e-3*(-rcn02 - rcn0B - rcn0CaN);
+  double dCa2CaM = 1e-3*(rcn02 - rcn24 - rcn2B - rcn2CaN + CaMKIItotSL*(-rcnCKib2 + rcnCKt2a) );
+  double dCa4CaM = 1e-3*(rcn24 - rcn4B - rcn4CaN + CaMKIItotSL*(-rcnCKib+rcnCKta) );
+  double dCaMB = 1e-3*(rcn0B-rcn02B);
+  double dCa2CaMB = 1e-3*(rcn02B + rcn2B - rcn24B);
+  double dCa4CaMB = 1e-3*(rcn24B + rcn4B);
+
+  // CaMKII equations
+  double dPb2 = 1e-3*(rcnCKib2 - rcnCKb2b + rcnCKt2b2); // Pb2_sl[id]
+  double dPb = 1e-3*(rcnCKib + rcnCKb2b - rcnCKbt);    // Pb_sl[id]
+  double dPt = 1e-3*(rcnCKbt-rcnCKta-rcnCKtt2);        // Pt_sl[id]
+  double dPt2 = 1e-3*(rcnCKtt2-rcnCKt2a-rcnCKt2b2);     // Pt2_sl[id]
+  double dPa = 1e-3*(rcnCKta+rcnCKt2a-rcnCKai);       // Pa_sl[id]
+
+  // CaN equations
+  double dCa4CaN = 1e-3*(rcnCa4CaN - rcn0CaN - rcn2CaN - rcn4CaN);                       // Ca4CaN_sl[id]
+  double dCaMCa4CaN = 1e-3*(rcn0CaN - rcn02CaN);           // CaMCa4CaN_sl[id]
+  double dCa2CaMCa4CaN = 1e-3*(rcn2CaN+rcn02CaN-rcn24CaN);    // Ca2CaMCa4CaN_sl[id]
+  double dCa4CaMCa4CaN = 1e-3*(rcn4CaN+rcn24CaN);             // Ca4CaMCa4CaN_sl[id]
+
+  double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
+  
+  //Assign dydt
+  dydt_CaMSL = dydt;
+
+  // write to global variables for adjusting Ca dyad buffering in EC coupling model
+  double JCa = 1e-3*(2*CaMKIItotSL*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
+
+  JCaSL[id] = JCa;
 }
+void CSubcell::calc_dydt_CaM_Cyt_ODEs(int id){
+  double K = 135; // mM
+  double Mg = 1; //mM
 
 
-void CSubcell::solve_ODE_CaM(int id, double dt, double* dydt_CaM, int CaM_compartment){
+  // Negroni et al model - CaM_cyt module
+
+  //// Descriptions for state variables
+  // Ca2CaM_cyt[id] = y(1);  // 2 Ca bound to C terminal sites
+  // Ca4CaM_cyt[id] = y(2);  // 4 Ca bound
+  // CaMB_cyt[id] = y(3);   
+  // Ca2CaMB_cyt[id] = y(4);
+  // Ca4CaMB_cyt[id] = y(5);
+  // Pb2_cyt[id] = y(6);     // probability of a Ca2CaM_cyt[id] bound CaMKII subunit
+  // Pb_cyt[id] = y(7);      // probability of a Ca4CaM_cyt[id] bound CaMKII subunit
+  // Pt_cyt[id] = y(8);      // probability of a Ca4CaM_cyt[id] bound autophosphorylated CaMKII subunit
+  // Pt2_cyt[id] = y(9);     // probability of a Ca2CaMxx bound autophosphorylated CaMKII subunit
+  // Pa_cyt[id] = y(10);     // probability of an autonomous autophosphorylated CaMKII subunit
+  // CaMCaN = y(11);
+  // Ca2CaMCaN = y(12);
+  // Ca4CaMCaN = y(13);  // active calcineurin
+  // description of intermediate variables
+  // CaM_cyt- Ca free CaM_cyt
+  ////
+
+  // Parameters
+  // Ca/CaM_cyt parameters
+  double Kd02, Kd24;
+  if(Mg <= 1){
+      Kd02 = 0.0025*(1+K/0.94-Mg/0.012)*(1+K/8.1+Mg/0.022);  // [uM^2]
+      Kd24 = 0.128*(1+K/0.64+Mg/0.0014)*(1+K/13.0-Mg/0.153); // [uM^2]
+  }
+  else{
+      Kd02 = 0.0025*(1+K/0.94-1/0.012+(Mg-1)/0.060)*(1+K/8.1+1/0.022+(Mg-1)/0.068);   // [uM^2]
+      Kd24 = 0.128*(1+K/0.64+1/0.0014+(Mg-1)/0.005)*(1+K/13.0-1/0.153+(Mg-1)/0.150);  // [uM^2]
+  }
+
+  double k20 = 10;               // [s^-1]      
+  double k02 = k20/Kd02;         // [uM^-2 s^-1]
+  double k42 = 500;              // [s^-1]      
+  double k24 = k42/Kd24;         // [uM^-2 s^-1]
+
+  // CaM_cyt buffering (B) parameters
+  double k0Boff = 0.0014;        // [s^-1] 
+  double k0Bon = k0Boff/0.2;   // [uM^-1 s^-1] kon = koff/Kd
+  double k2Boff = k0Boff/100;    // [s^-1] 
+  double k2Bon = k0Bon;          // [uM^-1 s^-1]
+  double k4Boff = k2Boff;        // [s^-1]
+  double k4Bon = k0Bon;          // [uM^-1 s^-1]
+  // using thermodynamic constraints
+  double k20B = k20/100; // [s^-1] thermo constraint on loop 1
+  double k02B = k02;     // [uM^-2 s^-1] 
+  double k42B = k42;     // [s^-1] thermo constraint on loop 2
+  double k24B = k24;     // [uM^-2 s^-1]
+
+  // CaMKII parameters
+  // Wi Wa Wt Wp
+  double kbi = 2.2;      // [s^-1] (Ca4CaM_cyt[id] dissocation from Wb)
+  double kib = kbi/33.5e-3; // [uM^-1 s^-1]
+  double kib2 = kib;
+  double kb2i = kib2*5;
+  double kb24 = k24;
+  double kb42 = k42*33.5e-3/5;
+  double kpp1 = 1.72;    // [s^-1] (PP1-dep dephosphorylation rates)
+  double Kmpp1 = 11.5;   // [uM]
+  double kta = kbi/1000; // [s^-1] (Ca4CaM_cyt[id] dissociation from Wt)
+  double kat = kib;      // [uM^-1 s^-1] (Ca4CaM_cyt[id] reassociation with Wa)
+  double kt42 = k42*33.5e-6/5;
+  double kt24 = k24;
+  double kat2 = kib;
+  double kt2a = kib*5;
+
+  // CaN parameters
+  double kcanCaoff = 1;              // [s^-1] 
+  double kcanCaon = kcanCaoff/0.5;   // [uM^-1 s^-1] 
+  double kcanCaM4on = 46;            // [uM^-1 s^-1]
+  double kcanCaM4off = 1.3e-3;       // [s^-1]
+  double kcanCaM2on = kcanCaM4on;
+  double kcanCaM2off = 2508*kcanCaM4off;
+  double kcanCaM0on = kcanCaM4on;
+  double kcanCaM0off = 165*kcanCaM2off;
+  double k02can = k02;
+  double k20can = k20/165;
+  double k24can = k24;
+  double k42can = k20/2508;
+
+  // CaM_cyt Reaction fluxes
+  double rcn02 = k02*pow(cp[id],2)*CaM_cyt[id] - k20*Ca2CaM_cyt[id];
+  double rcn24 = k24*pow(cp[id],2)*Ca2CaM_cyt[id] - k42*Ca4CaM_cyt[id];
+  // CaM_cyt buffer fluxes
+  double B = BtotCyt - CaMB_cyt[id] - Ca2CaMB_cyt[id] - Ca4CaMB_cyt[id];
+  double rcn02B = k02B*pow(cp[id],2)*CaMB_cyt[id] - k20B*Ca2CaMB_cyt[id];
+  double rcn24B = k24B*pow(cp[id],2)*Ca2CaMB_cyt[id] - k42B*Ca4CaMB_cyt[id];
+  double rcn0B = k0Bon*CaM_cyt[id]*B - k0Boff*CaMB_cyt[id];
+  double rcn2B = k2Bon*Ca2CaM_cyt[id]*B - k2Boff*Ca2CaMB_cyt[id];
+  double rcn4B = k4Bon*Ca4CaM_cyt[id]*B - k4Boff*Ca4CaMB_cyt[id];
+  // CaN reaction fluxes 
+  double Ca2CaN = CaNtotCyt - Ca4CaN_cyt[id] - CaMCa4CaN_cyt[id] - Ca2CaMCa4CaN_cyt[id] - Ca4CaMCa4CaN_cyt[id];
+  double rcnCa4CaN = kcanCaon*pow(cp[id],2)*Ca2CaN - kcanCaoff*Ca4CaN_cyt[id];
+  double rcn02CaN = k02can*pow(cp[id],2)*CaMCa4CaN_cyt[id] - k20can*Ca2CaMCa4CaN_cyt[id]; 
+  double rcn24CaN = k24can*pow(cp[id],2)*Ca2CaMCa4CaN_cyt[id] - k42can*Ca4CaMCa4CaN_cyt[id];
+  double rcn0CaN = kcanCaM0on*CaM_cyt[id]*Ca4CaN_cyt[id] - kcanCaM0off*CaMCa4CaN_cyt[id];
+  double rcn2CaN = kcanCaM2on*Ca2CaM_cyt[id]*Ca4CaN_cyt[id] - kcanCaM2off*Ca2CaMCa4CaN_cyt[id];
+  double rcn4CaN = kcanCaM4on*Ca4CaM_cyt[id]*Ca4CaN_cyt[id] - kcanCaM4off*Ca4CaMCa4CaN_cyt[id];
+  // CaMKII reaction fluxes
+  double Pi = 1 - Pb2_cyt[id] - Pb_cyt[id] - Pt_cyt[id] - Pt2_cyt[id] - Pa_cyt[id];
+  double rcnCKib2 = kib2*Ca2CaM_cyt[id]*Pi - kb2i*Pb2_cyt[id];
+  double rcnCKb2b = kb24*pow(cp[id],2)*Pb2_cyt[id] - kb42*Pb_cyt[id];
+  double rcnCKib = kib*Ca4CaM_cyt[id]*Pi - kbi*Pb_cyt[id];
+  double T = Pb_cyt[id] + Pt_cyt[id] + Pt2_cyt[id] + Pa_cyt[id];
+  double kbt = 0.055*T + .0074*pow(T,2) + 0.015*pow(T,3);
+  double rcnCKbt = kbt*Pb_cyt[id] - kpp1*PP1totCyt*Pt_cyt[id]/(Kmpp1+CaMKIItotCyt*Pt_cyt[id]);
+  double rcnCKtt2 = kt42*Pt_cyt[id] - kt24*pow(cp[id],2)*Pt2_cyt[id];
+  double rcnCKta = kta*Pt_cyt[id] - kat*Ca4CaM_cyt[id]*Pa_cyt[id];
+  double rcnCKt2a = kt2a*Pt2_cyt[id] - kat2*Ca2CaM_cyt[id]*Pa_cyt[id];
+  double rcnCKt2b2 = kpp1*PP1totCyt*Pt2_cyt[id]/(Kmpp1+CaMKIItotCyt*Pt2_cyt[id]);
+  double rcnCKai = kpp1*PP1totCyt*Pa_cyt[id]/(Kmpp1+CaMKIItotCyt*Pa_cyt[id]);
+
+  // CaM_cyt equations
+  double dCaM = 1e-3*(-rcn02 - rcn0B - rcn0CaN);
+  double dCa2CaM = 1e-3*(rcn02 - rcn24 - rcn2B - rcn2CaN + CaMKIItotCyt*(-rcnCKib2 + rcnCKt2a) );
+  double dCa4CaM = 1e-3*(rcn24 - rcn4B - rcn4CaN + CaMKIItotCyt*(-rcnCKib+rcnCKta) );
+  double dCaMB = 1e-3*(rcn0B-rcn02B);
+  double dCa2CaMB = 1e-3*(rcn02B + rcn2B - rcn24B);
+  double dCa4CaMB = 1e-3*(rcn24B + rcn4B);
+
+  // CaMKII equations
+  double dPb2 = 1e-3*(rcnCKib2 - rcnCKb2b + rcnCKt2b2); // Pb2_cyt[id]
+  double dPb = 1e-3*(rcnCKib + rcnCKb2b - rcnCKbt);    // Pb_cyt[id]
+  double dPt = 1e-3*(rcnCKbt-rcnCKta-rcnCKtt2);        // Pt_cyt[id]
+  double dPt2 = 1e-3*(rcnCKtt2-rcnCKt2a-rcnCKt2b2);     // Pt2_cyt[id]
+  double dPa = 1e-3*(rcnCKta+rcnCKt2a-rcnCKai);       // Pa_cyt[id]
+
+  // CaN equations
+  double dCa4CaN = 1e-3*(rcnCa4CaN - rcn0CaN - rcn2CaN - rcn4CaN);                       // Ca4CaN_cyt[id]
+  double dCaMCa4CaN = 1e-3*(rcn0CaN - rcn02CaN);           // CaMCa4CaN_cyt[id]
+  double dCa2CaMCa4CaN = 1e-3*(rcn2CaN+rcn02CaN-rcn24CaN);    // Ca2CaMCa4CaN_cyt[id]
+  double dCa4CaMCa4CaN = 1e-3*(rcn4CaN+rcn24CaN);             // Ca4CaMCa4CaN_cyt[id]
+
+  double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
+  
+  //Assign dydt
+  dydt_CaMCyt = dydt;
+
+  // write to global variables for adjusting Ca dyad buffering in EC coupling model
+  double JCa = 1e-3*(2*CaMKIItotCyt*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
+
+  JCaCyt[id] = JCa;
+}
+void CSubcell::solve_ODE_CaM(int id){
   // double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
-  //CaM Cytosol
-  if(CaM_compartment == 0){
-    CaM_cyt[id] += dydt_CaM[0]*dt;
-    Ca2CaM_cyt[id] += dydt_CaM[1]*dt;
-    Ca4CaM_cyt[id] += dydt_CaM[2]*dt;
-    CaMB_cyt[id] += dydt_CaM[3]*dt;
-    Ca2CaMB_cyt[id] += dydt_CaM[4]*dt;
-    Ca4CaMB_cyt[id] += dydt_CaM[5]*dt;
-    Pb2_cyt[id] += dydt_CaM[6]*dt;
-    Pb_cyt[id] += dydt_CaM[7]*dt;
-    Pt_cyt[id] += dydt_CaM[8]*dt;
-    Pt2_cyt[id] += dydt_CaM[9]*dt;
-    Pa_cyt[id] += dydt_CaM[10]*dt;
-    Ca4CaN_cyt[id] += dydt_CaM[11]*dt;
-    CaMCa4CaN_cyt[id] += dydt_CaM[12]*dt;
-    Ca2CaMCa4CaN_cyt[id] += dydt_CaM[13]*dt;
-    Ca4CaMCa4CaN_cyt[id] += dydt_CaM[14]*dt;
-  } 
-  //CaM Sarcolemmal
-  else if(CaM_compartment == 1){
-    CaM_sl[id] += dydt_CaM[0]*dt;
-    Ca2CaM_sl[id] += dydt_CaM[1]*dt;
-    Ca4CaM_sl[id] += dydt_CaM[2]*dt;
-    CaMB_sl[id] += dydt_CaM[3]*dt;
-    Ca2CaMB_sl[id] += dydt_CaM[4]*dt;
-    Ca4CaMB_sl[id] += dydt_CaM[5]*dt;
-    Pb2_sl[id] += dydt_CaM[6]*dt;
-    Pb_sl[id] += dydt_CaM[7]*dt;
-    Pt_sl[id] += dydt_CaM[8]*dt;
-    Pt2_sl[id] += dydt_CaM[9]*dt;
-    Pa_sl[id] += dydt_CaM[10]*dt;
-    Ca4CaN_sl[id] += dydt_CaM[11]*dt;
-    CaMCa4CaN_sl[id] += dydt_CaM[12]*dt;
-    Ca2CaMCa4CaN_sl[id] += dydt_CaM[13]*dt;
-    Ca4CaMCa4CaN_sl[id] += dydt_CaM[14]*dt;
-  }
-  //CaM Dyad/Cleft space
-  else if(CaM_compartment == 2){
-    CaM_dyad[id] += dydt_CaM[0]*dt;
-    Ca2CaM_dyad[id] += dydt_CaM[1]*dt;
-    Ca4CaM_dyad[id] += dydt_CaM[2]*dt;
-    CaMB_dyad[id] += dydt_CaM[3]*dt;
-    Ca2CaMB_dyad[id] += dydt_CaM[4]*dt;
-    Ca4CaMB_dyad[id] += dydt_CaM[5]*dt;
-    Pb2_dyad[id] += dydt_CaM[6]*dt;
-    Pb_dyad[id] += dydt_CaM[7]*dt;
-    Pt_dyad[id] += dydt_CaM[8]*dt;
-    Pt2_dyad[id] += dydt_CaM[9]*dt;
-    Pa_dyad[id] += dydt_CaM[10]*dt;
-    Ca4CaN_dyad[id] += dydt_CaM[11]*dt;
-    CaMCa4CaN_dyad[id] += dydt_CaM[12]*dt;
-    Ca2CaMCa4CaN_dyad[id] += dydt_CaM[13]*dt;
-    Ca4CaMCa4CaN_dyad[id] += dydt_CaM[14]*dt;
-  }
-  else{
-    std::cout << "Error: Unrecognized CaM_compartment in solve_ODE_CaM: " << CaM_compartment << std::endl;
-    exit(0);
-  }
+  
+  //CaM_dyad Cytosol
+    CaM_cyt[id] += dydt_CaMCyt[0]*dt;
+    Ca2CaM_cyt[id] += dydt_CaMCyt[1]*dt;
+    Ca4CaM_cyt[id] += dydt_CaMCyt[2]*dt;
+    CaMB_cyt[id] += dydt_CaMCyt[3]*dt;
+    Ca2CaMB_cyt[id] += dydt_CaMCyt[4]*dt;
+    Ca4CaMB_cyt[id] += dydt_CaMCyt[5]*dt;
+    Pb2_cyt[id] += dydt_CaMCyt[6]*dt;
+    Pb_cyt[id] += dydt_CaMCyt[7]*dt;
+    Pt_cyt[id] += dydt_CaMCyt[8]*dt;
+    Pt2_cyt[id] += dydt_CaMCyt[9]*dt;
+    Pa_cyt[id] += dydt_CaMCyt[10]*dt;
+    Ca4CaN_cyt[id] += dydt_CaMCyt[11]*dt;
+    CaMCa4CaN_cyt[id] += dydt_CaMCyt[12]*dt;
+    Ca2CaMCa4CaN_cyt[id] += dydt_CaMCyt[13]*dt;
+    Ca4CaMCa4CaN_cyt[id] += dydt_CaMCyt[14]*dt;
+  //CaM_dyad Sarcolemmal
+
+    CaM_sl[id] += dydt_CaMSL[0]*dt;
+    Ca2CaM_sl[id] += dydt_CaMSL[1]*dt;
+    Ca4CaM_sl[id] += dydt_CaMSL[2]*dt;
+    CaMB_sl[id] += dydt_CaMSL[3]*dt;
+    Ca2CaMB_sl[id] += dydt_CaMSL[4]*dt;
+    Ca4CaMB_sl[id] += dydt_CaMSL[5]*dt;
+    Pb2_sl[id] += dydt_CaMSL[6]*dt;
+    Pb_sl[id] += dydt_CaMSL[7]*dt;
+    Pt_sl[id] += dydt_CaMSL[8]*dt;
+    Pt2_sl[id] += dydt_CaMSL[9]*dt;
+    Pa_sl[id] += dydt_CaMSL[10]*dt;
+    Ca4CaN_sl[id] += dydt_CaMSL[11]*dt;
+    CaMCa4CaN_sl[id] += dydt_CaMSL[12]*dt;
+    Ca2CaMCa4CaN_sl[id] += dydt_CaMSL[13]*dt;
+    Ca4CaMCa4CaN_sl[id] += dydt_CaMSL[14]*dt;
+  
+  //CaM_dyad Dyad/Cleft space
+    CaM_dyad[id] += dydt_CaMDyad[0]*dt;
+    Ca2CaM_dyad[id] += dydt_CaMDyad[1]*dt;
+    Ca4CaM_dyad[id] += dydt_CaMDyad[2]*dt;
+    CaMB_dyad[id] += dydt_CaMDyad[3]*dt;
+    Ca2CaMB_dyad[id] += dydt_CaMDyad[4]*dt;
+    Ca4CaMB_dyad[id] += dydt_CaMDyad[5]*dt;
+    Pb2_dyad[id] += dydt_CaMDyad[6]*dt;
+    Pb_dyad[id] += dydt_CaMDyad[7]*dt;
+    Pt_dyad[id] += dydt_CaMDyad[8]*dt;
+    Pt2_dyad[id] += dydt_CaMDyad[9]*dt;
+    Pa_dyad[id] += dydt_CaMDyad[10]*dt;
+    Ca4CaN_dyad[id] += dydt_CaMDyad[11]*dt;
+    CaMCa4CaN_dyad[id] += dydt_CaMDyad[12]*dt;
+    Ca2CaMCa4CaN_dyad[id] += dydt_CaMDyad[13]*dt;
+    Ca4CaMCa4CaN_dyad[id] += dydt_CaMDyad[14]*dt;
+
 }
 
 
-void CSubcell::calc_dydt_CaMKII_ODEs(
-  int id, double* dydt_CaMKII,
-
-  //CaMKII State Variables
-  double& LCC_PKAp, double& LCC_CKdyadp, double& LCC_CKslp,
-  double& RyR2809p, double& RyR2815p, 
-  double& PLBT17p,
-
-   //CaMKII Parameters
-  double CaMKIIactDyad, double LCCtotDyad,
-  double RyRtot, double PP1_dyad, double PP2A_dyad,
-  double OA, double PLBtot, double CaMKIIactSL, 
-  double LCCtotSL, double PP1_SL, double PP1_PLB_avail
-  )
+void CSubcell::calc_dydt_CaMKII_ODEs(int id)
   {
   //// Description of state variables
-  // LCCp-PKA = y(1);        // [LCCp] by PKA (currently unused anywhere else)
+  // LCCp_PKA = y(1);        // [LCCp] by PKA (currently unused anywhere else)
   // LCCp-CaMKIIdyad = y(2); // Dyadic [LCCp] by dyadic CaMKII
   // RyR-Ser2809p = y(3);    // [RyR-Ser2809p] by PKA (currently unused anywhere else)
   // RyR-Ser2815p = y(4);    // [RyR-Ser2815p] by CaMKII 
@@ -3000,57 +3321,57 @@ void CSubcell::calc_dydt_CaMKII_ODEs(
   //// ODE EQUATIONS
   //// LCC states (note: PP2A is acting on PKA site and PP1 on CKII site)
   // CaMKII phosphorylation of Dyadic LCCs
-  double LCC_CKdyadn = LCCtotDyad - LCC_CKdyadp;
-  double LCCDyad_PHOS = (k_ckLCC*CaMKIIactDyad*LCC_CKdyadn)/(KmCK_LCC+LCC_CKdyadn);
-  double LCCDyad_DEPHOS = (k_pp1LCC*PP1_dyad*LCC_CKdyadp)/(KmPP1_LCC+LCC_CKdyadp)*OA_PP1;
+  double LCC_CKdyadn = LCCtotDyad - LCC_CKdyadp[id];
+  double LCCDyad_PHOS = (k_ckLCC*CaMKIIactDyad[id]*LCC_CKdyadn)/(KmCK_LCC+LCC_CKdyadn);
+  double LCCDyad_DEPHOS = (k_pp1LCC*PP1_dyad*LCC_CKdyadp[id])/(KmPP1_LCC+LCC_CKdyadp[id])*OA_PP1;
   double dLCC_CKdyadp = LCCDyad_PHOS - LCCDyad_DEPHOS;
 
   // CaMKII phosphorylation of Sub-sarcolemmal LCCs
-  double LCC_CKsln = LCCtotSL - LCC_CKslp;
-  double LCCSL_PHOS = (k_ckLCC*CaMKIIactSL*LCC_CKsln)/(KmCK_LCC+LCC_CKsln); 
-  double LCCSL_DEPHOS = (k_pp1LCC*PP1_SL*LCC_CKslp)/(KmPP1_LCC+LCC_CKslp)*OA_PP1;
+  double LCC_CKsln = LCCtotSL - LCC_CKslp[id];
+  double LCCSL_PHOS = (k_ckLCC*CaMKIIactSL[id]*LCC_CKsln)/(KmCK_LCC+LCC_CKsln); 
+  double LCCSL_DEPHOS = (k_pp1LCC*PP1_SL*LCC_CKslp[id])/(KmPP1_LCC+LCC_CKslp[id])*OA_PP1;
   double dLCC_CKslp = LCCSL_PHOS - LCCSL_DEPHOS; 
 
-  // PKA phosphorylation (currently unused elsewhere)
-  double LCC_PKAn = LCCtotDyad - LCC_PKAp;
+  // PKA phosphorylation (currently unused elsewhere, obsolete with B-AR module)
+  double LCC_PKAn = LCCtotDyad - LCC_PKAp[id];
   double dLCC_PKAp = (k_pkaLCC*PKAc*LCC_PKAn)/(KmPKA_LCC+LCC_PKAn) - 
-              (k_pp2aLCC*PP2A_dyad*LCC_PKAp)/(KmPP2A_LCC+LCC_PKAp)*OA_PP2A;
+              (k_pp2aLCC*PP2A_dyad*LCC_PKAp[id])/(KmPP2A_LCC+LCC_PKAp[id])*OA_PP2A;
   //// RyR states
-  double RyR2815n = RyRtot - RyR2815p;
+  double RyR2815n = RyRtot - RyR2815p[id];
   double RyR_BASAL = kb_2815*RyR2815n;
-  double RyR_PHOS = (k_ckRyR*CaMKIIactDyad*RyR2815n)/(KmCK_RyR+RyR2815n);
-  double RyR_PP1_DEPHOS = (k_pp1RyR*PP1_dyad*RyR2815p)/(KmPP1_RyR+RyR2815p)*OA_PP1;
-  double RyR_PP2A_DEPHOS = (k_pp2aRyR*PP2A_dyad*RyR2815p)/(KmPP2A_RyR+RyR2815p)*OA_PP2A;
+  double RyR_PHOS = (k_ckRyR*CaMKIIactDyad[id]*RyR2815n)/(KmCK_RyR+RyR2815n);
+  double RyR_PP1_DEPHOS = (k_pp1RyR*PP1_dyad*RyR2815p[id])/(KmPP1_RyR+RyR2815p[id])*OA_PP1;
+  double RyR_PP2A_DEPHOS = (k_pp2aRyR*PP2A_dyad*RyR2815p[id])/(KmPP2A_RyR+RyR2815p[id])*OA_PP2A;
   double dRyR2815p = RyR_BASAL + RyR_PHOS - RyR_PP1_DEPHOS - RyR_PP2A_DEPHOS;
 
   // PKA phosphorylation of Ser 2809 on RyR (currently unused elsewhere)
-  double RyR2809n = RyRtot - RyR2809p;
+  double RyR2809n = RyRtot - RyR2809p[id];
   double dRyR2809p = kb_2809*RyR2809n + (k_pkaRyR*PKAc*RyR2809n)/(KmPKA_RyR+RyR2809n) - 
-              (k_pp1RyR*PP1_dyad*RyR2809p)/(KmPP1_RyR+RyR2809p)*OA_PP1;        
+              (k_pp1RyR*PP1_dyad*RyR2809p[id])/(KmPP1_RyR+RyR2809p[id])*OA_PP1;        
   //// PLB states
-  double PP1_PLB = PP1_dyad*PP1_PLB_avail;    // Inhibitor-1 regulation of PP1_dyad included here
-  double PLBT17n = PLBtot - PLBT17p;
-  double PLB_PHOS = (k_ckPLB*PLBT17n*CaMKIIactDyad)/(KmCK_PLB+PLBT17n);
-  double PLB_DEPHOS = (k_pp1PLB*PP1_PLB*PLBT17p)/(KmPP1_PLB+PLBT17p)*OA_PP1;
+  double PP1_PLB = PP1_dyad*PP1_PLB_avail[id];    // Inhibitor-1 regulation of PP1_dyad included here
+  double PLBT17n = PLBtot - PLBT17p[id];
+  double PLB_PHOS = (k_ckPLB*PLBT17n*CaMKIIactDyad[id])/(KmCK_PLB+PLBT17n);
+  double PLB_DEPHOS = (k_pp1PLB*PP1_PLB*PLBT17p[id])/(KmPP1_PLB+PLBT17p[id])*OA_PP1;
   double dPLBT17p = PLB_PHOS - PLB_DEPHOS; 
 
   //// Collect ODEs and convert to uM/ms
-  double dydt[]={dLCC_PKAp*10e-3, dLCC_CKdyadp*10e-3, dRyR2809p*10e-3, dRyR2815p*10e-3,dPLBT17p*10e-3, dLCC_CKslp*10e-3};  // Convert to uM/ms
+  double dydt[6]={dLCC_PKAp*10e-3, dLCC_CKdyadp*10e-3, dRyR2809p*10e-3, dRyR2815p*10e-3,dPLBT17p*10e-3, dLCC_CKslp*10e-3};  // Convert to uM/ms
 
   dydt_CaMKII = dydt;
 
 }
 
-void CSubcell::solve_ODE_CaMKII(int id, double dt, double* dydt_CaMKII){
-  LCC_PKAp[id] += dydt_CaMKII[0]*dt;
+void CSubcell::solve_ODE_CaMKII(int id){
+  LCC_PKAp[id] += dydt_CaMKII[0]*dt; //unused
   LCC_CKdyadp[id] += dydt_CaMKII[1]*dt;
-  RyR2809p[id] += dydt_CaMKII[2]*dt;
+  RyR2809p[id] += dydt_CaMKII[2]*dt; //unused
   RyR2815p[id] += dydt_CaMKII[3]*dt;
   PLBT17p[id] += dydt_CaMKII[4]*dt;
   LCC_CKslp[id] += dydt_CaMKII[5]*dt;
 }
 
-
+#endif
 
 
 

@@ -297,19 +297,24 @@ public:
 #endif
 
 #ifdef ___PTM
-  double *RyR_CKp, *RyR_PKAp;
-  
+
+
   //All Parameters
-  char** expression;
-  double *CaMtotDyad,*BtotDyad,*CaMKIItotDyad,*CaNtotDyad,*PP1totDyad;
-  double *CaMtotSL,*BtotSL,*CaMKIItotSL,*CaNtotSL,*PP1totSL;
-  double *CaMtotCyt,*BtotCyt,*CaMKIItotCyt,*CaNtotCyt,*PP1totCyt;
-  double *LCCtotDyad,*RyRtot,*PP1_dyad,* PP2A_dyad,*OA,*LCCtotSL,*PP1_SL;
-  double *PLBtot,*Ligtot,*LCCtotBA,*RyRtotBA,*PLBtotBA,*TnItotBA,*IKstotBA,*ICFTRtotBA,*PP1_PLBtot;
-  double *PLMtotBA,*MyototBA,*IKrtotBA,*IClCatotBA,*CKIIOE,*recoveryTime;
+  int expression;
+  double CaMtotDyad,BtotDyad,CaMKIItotDyad,CaNtotDyad,PP1totDyad;
+  double CaMtotSL,BtotSL,CaMKIItotSL,CaNtotSL,PP1totSL;
+  double CaMtotCyt,BtotCyt,CaMKIItotCyt,CaNtotCyt,PP1totCyt;
+  double LCCtotDyad,RyRtot,PP1_dyad, PP2A_dyad,OA,LCCtotSL,PP1_SL;
+  double PLBtot,Ligtot,LCCtotBA,RyRtotBA,PLBtotBA,TnItotBA,IKstotBA,ICFTRtotBA,PP1_PLBtot;
+  double PLMtotBA,MyototBA,IKrtotBA,IClCatotBA,CKIIOE,recoveryTime;
 
 
-  //* * * * * CaM Variables * * * * * 
+  void allocate_memory_all_PTM_vars(int n);
+  void init_const_parameters_PTM();
+  void init_state_variables_PTMs(int id);
+
+  //* * * * * CaM State Variables * * * * * 
+    double *dydt_CaMDyad, *dydt_CaMSL, *dydt_CaMCyt;
     double *JCaCyt, *JCaSL, *JCaDyad;
 
     //CaM_Dyad
@@ -327,26 +332,17 @@ public:
     double *Ca4CaMB_cyt,*Pb2_cyt,*Pb_cyt,*Pt_cyt,*Pt2_cyt,*Pa_cyt,*Ca4CaN_cyt;
     double *CaMCa4CaN_cyt,*Ca2CaMCa4CaN_cyt,*Ca4CaMCa4CaN_cyt;
 
-    void allocate_memory_all_PTM_vars(int n);
-    void init_parameters_PTM_CaM(int n);
-    // double* calc_dydt_CaM_ODEs(int id, double CaMtot, double Btot, double CaMKIItot, double CaNtot, double PP1tot, double Ca, int CaM_compartment);
-    void calc_dydt_CaM_ODEs(
-      int id, double* dydt_CaM,
-      //CaM State Variables
-      double& Ca2CaM, double& Ca4CaM, double& CaMB, double& Ca2CaMB, double& Ca4CaMB,
-      double& Pb2, double& Pb, double& Pt, double& Pt2, double& Pa,
-      double& CaM, double& Ca4CaN, double& CaMCa4CaN, double& Ca2CaMCa4CaN, double& Ca4CaMCa4CaN,
-
-      //CaM Parameters 
-      double CaMtot, double Btot, double CaMKIItot, double CaNtot, double PP1tot, double Ca, 
-      int CaM_compartment
-    );
-    void solve_ODE_CaM(int id, double dt, double* dydt_CaM, int CaM_compartment);
+    void calc_dydt_CaM_Dyad_ODEs(int id);
+    void calc_dydt_CaM_SL_ODEs(int id);
+    void calc_dydt_CaM_Cyt_ODEs(int id);
+    
+    void solve_ODE_CaM(int id);
   //* * * * * CaM Variables * * * * * 
 
   //* * * * * CaMKII Variables * * * * *  
 
     //CaMKII State Variables
+    double *dydt_CaMKII;
     double *LCC_PKAp, *LCC_CKdyadp, *LCC_CKslp;
     double *RyR2809p, *RyR2815p;
     double *PLBT17p;
@@ -354,27 +350,13 @@ public:
     //CaMKII parameters
     //Not yet defined
     double *CaMKIIactDyad, *CaMKIIactSL, *PP1_PLB_avail;
-    
-    //Defined in all parametetrs
-    // double LCCtotDyad, double RyRtot, double PP1_dyad, double PP2A_dyad,double OA, double PLBtot, , double LCCtotSL, double PP1_SL, 
 
     //CaMKII Parameters
+    // *LCC_CKdyadp, 
+    double *RyR_CKp, *PLB_CKp;
 
-    void calc_dydt_CaMKII_ODEs(
-      int id, double* dydt_CaMKII,
-
-      //CaMKII State Variables
-      double& LCC_PKAp, double& LCC_CKdyadp, double& LCC_CKslp,
-      double& RyR2809p, double& RyR2815p, 
-      double& PLBT17p,
-
-       //CaMKII Parameters
-      double CaMKIIactDyad, double LCCtotDyad,
-      double RyRtot, double PP1_dyad, double PP2A_dyad,
-      double OA, double PLBtot, double CaMKIIactSL, 
-      double LCCtotSL, double PP1_SL, double PP1_PLB_avail
-      );
-    void solve_ODE_CaMKII(int id, double dt, double* dydt_CaMKII);
+    void calc_dydt_CaMKII_ODEs(int id);
+    void solve_ODE_CaMKII(int id);
   //* * * * * CaMKII Variables * * * * * 
 
 #endif 

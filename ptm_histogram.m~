@@ -41,29 +41,6 @@ box off
 ylim([0 200])
 xlim([0 1000])
 
-
-nryr_ptm = ptm_actual_data(:,1);
-vp_ptm = ptm_actual_data(:,2);
-Jmax_ptm = ptm_actual_data(:,3);
-ci_ptm = ptm_actual_data(:,4);
-cs_ptm = ptm_actual_data(:,5);
-cp_ptm = ptm_actual_data(:,6);
-
-%Plot #3
-figure('Position', [1920*2/3 0 1920/3 1080/2])
-set(gcf, 'Renderer', 'Painters')
-set(gcf, 'color','w')
-h2 = histogram(cp_ptm*1000,12,'FaceColor', [1 0 0], 'EdgeColor', 'black', 'FaceAlpha',1, 'LineWidth', 1);
-% set(h, 'barwidth', 0.9)
-xlabel('[Ca]_C_l_e_f_t (nM)')
-ylabel('# of CRUs')
-set(gca, 'FontName',  'arial', 'FontSize', 50)
-set(gca,'linewidth',1)
-
-box off
-ylim([0 200])
-xlim([0 1000])
-
 %% I-V Curve
 figure
 set(gcf, 'Color', 'white')
