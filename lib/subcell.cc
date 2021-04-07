@@ -160,8 +160,6 @@ void CSubcell::init(double initci, double initcj)
   cati=new double [nn];
   //  cats=new double [nn];
 
-  //TODO Create arrays for Soltis-Saucerman/Negroni model
-
   #ifdef ___PTM
     allocate_memory_all_PTM_vars(n);
     init_const_parameters_PTM();
@@ -386,6 +384,129 @@ void CSubcell::delarray(void)
   delete [] xsy;
   delete [] xsz;
   delete [] xsw;
+
+  #ifdef ___PTM
+
+    delete [] dydt_CaMDyad;
+    delete [] dydt_CaMSL;
+    delete [] dydt_CaMCyt;
+
+    delete [] JCaCyt;
+    delete [] JCaSL;
+    delete [] JCaDyad;
+
+    delete [] CaM_dyad;
+    delete [] Ca2CaM_dyad;
+    delete [] Ca4CaM_dyad;
+    delete [] CaMB_dyad;
+    delete [] Ca2CaMB_dyad;
+    delete [] Ca4CaMB_dyad;
+    delete [] Pb2_dyad;
+    delete [] Pb_dyad;
+    delete [] Pt_dyad;
+    delete [] Pt2_dyad;
+    delete [] Pa_dyad;
+    delete [] Ca4CaN_dyad;
+    delete [] CaMCa4CaN_dyad;
+    delete [] Ca2CaMCa4CaN_dyad;
+    delete [] Ca4CaMCa4CaN_dyad;
+
+    delete [] CaM_sl;
+    delete [] Ca2CaM_sl;
+    delete [] Ca4CaM_sl;
+    delete [] CaMB_sl;
+    delete [] Ca2CaMB_sl;
+    delete [] Ca4CaMB_sl;
+    delete [] Pb2_sl;
+    delete [] Pb_sl;
+    delete [] Pt_sl;
+    delete [] Pt2_sl;
+    delete [] Pa_sl;
+    delete [] Ca4CaN_sl;
+    delete [] CaMCa4CaN_sl;
+    delete [] Ca2CaMCa4CaN_sl;
+    delete [] Ca4CaMCa4CaN_sl;
+
+    delete [] CaM_cyt;
+    delete [] Ca2CaM_cyt;
+    delete [] Ca4CaM_cyt;
+    delete [] CaMB_cyt;
+    delete [] Ca2CaMB_cyt;
+    delete [] Ca4CaMB_cyt;
+    delete [] Pb2_cyt;
+    delete [] Pb_cyt;
+    delete [] Pt_cyt;
+    delete [] Pt2_cyt;
+    delete [] Pa_cyt;
+    delete [] Ca4CaN_cyt;
+    delete [] CaMCa4CaN_cyt;
+    delete [] Ca2CaMCa4CaN_cyt;
+    delete [] Ca4CaMCa4CaN_cyt;
+
+    delete [] dydt_CaMKII;
+    delete [] LCC_CKdyadp;
+    delete [] LCC_CKslp;
+    delete [] RyR2815p;
+    delete [] PLBT17p;
+    delete [] LCC_PKAp;
+    delete [] RyR2809p;
+    delete [] CaMKIIactDyad;
+    delete [] CaMKIIactSL;
+    delete [] PP1_PLB_avail;
+    delete [] RyR_CKp;
+    delete [] PLB_CKp;
+
+    delete [] dydt_BAR;
+    delete [] L;
+    delete [] B1AR;
+    delete [] Gs;
+    delete [] B1AR_ACT;
+    delete [] B1AR_S464;
+    delete [] B1AR_S301;
+    delete [] GsaGTPtot;
+    delete [] GsaGDP;
+    delete [] GsBy;
+    delete [] GsaGTP;
+    delete [] Fsk;
+    delete [] AC;
+    delete [] PDE;
+    delete [] IBMX;
+    delete [] cAMPtot;
+    delete [] cAMP;
+    delete [] PKAC_I;
+    delete [] PKAC_II;
+    delete [] PLBp;
+    delete [] Inhib1ptot;
+    delete [] Inhib1p;
+    delete [] PP1;
+
+    delete [] LCCa_PKAp_whole;
+    delete [] LCCb_PKAp_whole;
+    delete [] RyR_PKAp_whole;
+    delete [] TnI_PKAp_whole;
+    delete [] IKs_PKAn;
+    delete [] Yotiao_KCQN1;
+    delete [] IKs_PKAp_whole;
+    delete [] ICFTR_PKAp_whole;
+    delete [] PLM_PKAp_whole;
+    delete [] Myo_PKAp_whole;
+    delete [] IKr_PKAn;
+    delete [] Yotiao_hERG;
+    delete [] IKr_PKAp_whole;
+    delete [] IClCa_PKAp_whole;
+
+    delete [] LCCa_PKAp;
+    delete [] LCCb_PKAp;
+    delete [] PLB_PKAn;
+    delete [] RyR_PKAp;
+    delete [] TnI_PKAp;
+    delete [] IKs_PKAp;
+    delete [] ICFTR_PKAp;
+    delete [] PLM_PKAp;
+    delete [] Myo_PKAp;
+    delete [] IKr_PKAp;
+    delete [] IClCa_PKAp;
+  #endif 
 }
 
 CSubcell& CSubcell::operator=(const CSubcell& sc)
@@ -735,6 +856,7 @@ void CSubcell::pace(double v, double nai)
     double Ica=gca*ica*NL;
 #endif
 
+
     sumica+=Ica; //TODO Change ICa to include Soltis Saucerman PTMs
 
     //release current Ir
@@ -800,8 +922,8 @@ void CSubcell::pace(double v, double nai)
     double k43=Kb*cp2;
 #else
 
-#ifdef ___KOSRCA
-    double kCaSR = MaxSR - (MaxSR-MinSR)/(1+pow((ec50SR/cjsr[id]),hkosrca));
+#ifdef ___KOSRCA //Don't use currently (Originally from Shannon model)
+    double kCaSR = MaxSR - (MaxSR-MinSR)/(1+pow((ec50SR/(cjsr[id]*1e-3)),hkosrca)); //convert to mM
     double koSRCa = 10/kCaSR;
 #else
     const double koSRCa=1;
@@ -811,31 +933,64 @@ void CSubcell::pace(double v, double nai)
     double k43=koSRCa*Kb*sgmd+pedk43;
 #endif
 
+#ifdef ___SPTM
+    //D. Sato Quick Demo
+    std::cout << "D. Sato Quick Demo" << std::endl;
+    if (cp[id]>1.0) {
+      k12=k12*10;
+      k43=k43*10;
+    }  
+#endif 
+
 #ifdef ___PTM // TODO: Change PTMs
 
-    // //D. Sato Quick Demo
-    // if (cp[id]>1.0) {
-    //   k12=k12*2;
-    //   k43=k43*2;
-    // }
-
-    //Soltis Saucerman PTM 
-
-    double fCKII_RyR = (20 * RyR_CKp[id] / 3.0 - 1 / 3.0); //≈ 1.0005, Max = 19/3, 6
-    // double fPKA_RyR = RyR_PKAp[id] * 1.025 + 0.9750; //1.025*0.025 + 0.9750= 1.00065, Max = 2
-    double fPKA_RyR = 1; //Not implemented B-AR module yet TODO
-
     
-    // if(id%200==0){
+    //TODO Check dividing by zero or large number for NANs
+    //Soltis Saucerman/Negroni PTM 
+    double fCKII_RyR = (20.0 * RyR_CKp[id] / 3.0 - 1.0 / 3.0); //≈ 1.0005, Max = 19/3, 6
+    double fPKA_RyR = (RyR_PKAp[id] * 1.025) + 0.9750; // ≈
+    
+    // if(id%3==0){
+      // std::cout << id << ": dPa_dyad: " << dydt_CaMDyad[(id*15)+ 10]*dt << std::endl;;
+      // std::cout << id << ": Pa_dyad: " << Pa_dyad[id] << std::endl;
+      // std::cout << id << ": CaMKIIactDyad: " << CaMKIIactDyad[id] << std::endl;
+      // std::cout << id << ": CaMKIIactSL: " << CaMKIIactSL[id] << std::endl;
       // std::cout << id << ": RyR2815p: " << RyR2815p[id] << std::endl;
       // std::cout << id << ": RyR_CKp: " << RyR_CKp[id] << std::endl;
+      // std::cout << id << ": RyR_PKAp: " << RyR_CKp[id] << std::endl;
       // std::cout << id << ": fCKII_RYR: " << fCKII_RyR << std::endl;
+      // std::cout << id << ": fPKA_RyR: " << fPKA_RyR << std::endl;
       // std::cout << std::endl;
+      
     // }
+    
 
-    k12 *= (fCKII_RyR + fPKA_RyR - 1); //*= 1.0005, Max 7
-    k43 *= (fCKII_RyR + fPKA_RyR - 1); // Max 7
+    double FINE_TUNING = 1.0; //Theoretical parameter, choose any number ()
+    double BASELINE_PARAMETER = 0.0;
 
+    k12 *= (fCKII_RyR + fPKA_RyR - 1)* FINE_TUNING + BASELINE_PARAMETER; //Multiplier is always bigger than 1 
+    k43 *= (fCKII_RyR + fPKA_RyR - 1)* FINE_TUNING + BASELINE_PARAMETER; // 
+
+    //Currently, it's 0.66 to 1.05 (during pacing)
+    //Need to adjust so that it's from 1.0 to something larger (based on fine tuning)
+
+    RYR_multiplier[id] = (fCKII_RyR + fPKA_RyR - 1); //Sanity check, check if this is NAN
+
+    // if(id == 50){
+        
+
+    //     std::cout << "dRyR2815p       ["<< id <<"]: " << "\t" << dydt_CaMKII[(id*6)+3]*dt       << std::endl;
+    //     std::cout << "RyR2815p       ["<< id <<"]: " << "\t" << RyR2815p[id]       << std::endl;
+    //     std::cout << "RyR_CKp        ["<< id <<"]: " << "\t" << RyR_CKp[id]        << std::endl;
+    
+    //     // std::cout << "RyR_PKAp_whole ["<< id <<"]: " << "\t" << RyR_PKAp_whole[id] << std::endl;
+    //     // std::cout << "RyR_PKAp       ["<< id <<"]: " << "\t" << RyR_PKAp[id]       << std::endl;
+    
+    //     std::cout << "fCKII_RYR      ["<< id <<"]: " << "\t" << fCKII_RyR          << std::endl;
+    //     std::cout << "fPKA_RyR       ["<< id <<"]: " << "\t" << fPKA_RyR           << std::endl;
+    //     std::cout << "RYR_multiplier ["<< id <<"]: " << "\t" << RYR_multiplier[id] << std::endl;
+    //     std::cout << std::endl;
+    //   }
 
 #endif
 
@@ -949,35 +1104,6 @@ void CSubcell::pace(double v, double nai)
     Idps[crupos[id]]=(cp[id]-cs[crupos[id]])/taup;
 #endif
 
-#ifdef ___CPDIFF
-    //Instantaneous buffering functions
-    const double KCAM=7.0;
-    const double BCAM=24.0;
-    const double KSR=0.6;
-    const double BSR=47.0;
-    const double KMCa=0.033;
-    const double BMCa=140.0;
-    const double KMMg=3.64;
-    const double BMMg=140.0;
-    const double KSLH=0.3;
-    const double BSLH=13.4;
-
-    double CAM=BCAM*KCAM/((cp[id]+KCAM)*(cp[id]+KCAM));
-    double SR=BSR*KSR/((cp[id]+KSR)*(cp[id]+KSR));
-    double MCa=BMCa*KMCa/((cp[id]+KMCa)*(cp[id]+KMCa));
-    double MMg=BMMg*KMMg/((cp[id]+KMMg)*(cp[id]+KMMg));
-    double SLH=BSLH*KSLH/((cp[id]+KSLH)*(cp[id]+KSLH)); // only for cs
-    double Betap=1/(1+CAM+SR+MCa+MMg+SLH);
- 
-
-#ifdef ___DEBUG
-    if(isnan(Idps[crupos[id]])) //(Idsi != Idsi)
-    {
-      cout<<setprecision(10)<<id<<"\t"<<Idps[crupos[id]]<<"\t cp="<<cp[id]<<"\t cs="<<cs[crupos[id]]<<endl;
-      bSTOP = true;
-    }
-#endif
-
 
 #ifdef ___CONTRACTION //TODO implement Negroni 
 #endif 
@@ -985,6 +1111,8 @@ void CSubcell::pace(double v, double nai)
   //Main PTM ODEs
 #ifdef ___PTM
 
+
+  // std::cout << "ENTERED MAIN CALC LOOP " << std::endl;
   //CaM_dyad Equations
     //CaM_dyad Dyad
     calc_dydt_CaM_Dyad_ODEs(id);
@@ -1000,28 +1128,78 @@ void CSubcell::pace(double v, double nai)
     CaMKIIactDyad[id] = CaMKIItotDyad*(Pb_dyad[id]+Pt_dyad[id]+Pt2_dyad[id]+Pa_dyad[id]); // Multiply total by fraction of activated CaMKII states (Pb, Pt, Pt2, Pa)
     CaMKIIactSL[id] = CaMKIItotSL*(Pb_sl[id]+Pt_sl[id]+Pt2_sl[id]+Pa_sl[id]);
 
-    //Original
-    // PP1_PLB_avail[id] = y(83+6+45+6+22)/PP1_PLBtot + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
-    
-    //TODO: PLACEHOLDER, y(83+6+45+6+22) depends on the B-AR module which is not implemented
-    PP1_PLB_avail[id] = 0.8819/PP1_PLBtot + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
+    // if(id == 50){
+    //   std::cout << "CaMKIIactDyad ["<< id <<"]: " << "\t" << CaMKIIactDyad[id]       << std::endl;
+    //   std::cout << "Pb_dyad       ["<< id <<"]: " << "\t" << Pb_dyad[id]       << std::endl;
+    //   std::cout << "Pt_dyad       ["<< id <<"]: " << "\t" << Pt_dyad[id]       << std::endl;
+    //   std::cout << "Pt2_dyad      ["<< id <<"]: " << "\t" << Pt2_dyad[id]       << std::endl;
+    //   std::cout << "Pa_dyad       ["<< id <<"]: " << "\t" << Pa_dyad[id]       << std::endl;
+    // }
+    // PP1_PLB_avail[id] = PP1[id]/PP1_PLBtot + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
 
     calc_dydt_CaMKII_ODEs(id);
     LCC_CKdyadp[id] = LCC_CKdyadp[id]/LCCtotDyad;   //136 fractional CaMKII-dependent LCC dyad phosphorylation
     RyR_CKp[id] = RyR2815p[id]/RyRtot;           //138 fractional CaMKII-dependent RyR phosphorylation
     PLB_CKp[id] = PLBT17p[id]/PLBtot;           //139 fractional CaMKII-dependent PLB phosphorylation
-    
+  
+  //Beta Adrenergic/PKA equations
+    calc_dydt_BAR_ODEs(id);
+    LCCa_PKAp[id] = LCCa_PKAp_whole[id]/LCCtotBA;
+    LCCb_PKAp[id] = LCCb_PKAp_whole[id]/LCCtotBA;
+    PLB_PKAn[id] = (PLBtotBA - PLBp[id])/PLBtotBA; // non-phosphorylated PLB targets
+    RyR_PKAp[id] = RyR_PKAp_whole[id]/RyRtotBA;
+    TnI_PKAp[id] = TnI_PKAp_whole[id]/TnItotBA;
+    IKs_PKAp[id] = IKs_PKAp_whole[id]/IKstotBA;
+    ICFTR_PKAp[id] = ICFTR_PKAp_whole[id]/ICFTRtotBA;
+    PLM_PKAp[id] = PLM_PKAp_whole[id]/PLMtotBA;
+    Myo_PKAp[id] = Myo_PKAp_whole[id]/MyototBA;
+    IKr_PKAp[id] = IKr_PKAp_whole[id]/IKrtotBA;
+    IClCa_PKAp[id] = IClCa_PKAp_whole[id]/IClCatotBA;
+
     solve_ODE_CaM(id);
     solve_ODE_CaMKII(id);
-
+    solve_ODE_BAR(id);
+    // std::cout << "EXITED MAIN CALC LOOP " << std::endl;
 #endif
 
-#ifdef ___NCX
-    double dcp=Betap*(Ir-Ica+jnaca-Idps[crupos[id]]);
-#else
-    double dcp=Betap*(Ir-Ica-Idps[crupos[id]]);
-#endif
-    cp[id]+=dcp*dt;
+#ifdef ___CPDIFF
+  //Instantaneous buffering functions
+  const double KCAM=7.0;
+  const double BCAM=24.0;
+  const double KSR=0.6;
+  const double BSR=47.0;
+  const double KMCa=0.033;
+  const double BMCa=140.0;
+  const double KMMg=3.64;
+  const double BMMg=140.0;
+  const double KSLH=0.3;
+  const double BSLH=13.4;
+
+  double CAM=BCAM*KCAM/((cp[id]+KCAM)*(cp[id]+KCAM));
+  double SR=BSR*KSR/((cp[id]+KSR)*(cp[id]+KSR));
+  double MCa=BMCa*KMCa/((cp[id]+KMCa)*(cp[id]+KMCa));
+  double MMg=BMMg*KMMg/((cp[id]+KMMg)*(cp[id]+KMMg));
+  double SLH=BSLH*KSLH/((cp[id]+KSLH)*(cp[id]+KSLH)); // only for cs
+  double Betap=1/(1+CAM+SR+MCa+MMg+SLH);
+ 
+
+  #ifdef ___DEBUG
+      if(isnan(Idps[crupos[id]])) //(Idsi != Idsi)
+      {
+        cout<<setprecision(10)<<id<<"\t"<<Idps[crupos[id]]<<"\t cp="<<cp[id]<<"\t cs="<<cs[crupos[id]]<<endl;
+        bSTOP = true;
+      }
+  #endif
+
+
+
+  #ifdef ___NCX
+      double dcp=Betap*(Ir-Ica+jnaca-Idps[crupos[id]]);
+  #else
+      double dcp=Betap*(Ir-Ica-Idps[crupos[id]]);
+  #endif
+
+  cp[id]+=dcp*dt;
 #else
     cp[id]=newcp;
 #endif
@@ -1155,10 +1333,6 @@ void CSubcell::pace(double v, double nai)
     double dci=Betai*(Idsi*(vs/vi)-Iup+Ileak-ITCi+Ici[id]);
 #endif
     double dcnsr=((Iup-Ileak)*(vi/vnsr)-Itr[id]*(vjsr/vnsr)+Icnsr[id]);
-
-//Signaling network (ODEs go here, before dci) TODO
-    // dRYR_CKp = ci[id]*
-    // RyR_CKp[id] += dRYR_CKp*dt;
 
     ci[id]+=dci*dt; // Update the  
     cati[id]+=ITCi*dt;
@@ -2483,57 +2657,14 @@ void CSubcell::voltage_clamp(double t, double peak_v, bool output, double dt, do
 
 #ifdef ___PTM
 void CSubcell::allocate_memory_all_PTM_vars(int n){
-  //TODO
   // std::cout <<"ENTERED allocate memory all PTM_vars" << std::endl;
 
-  // RyR_CKp = new double[n];
-  // RyR_PKAp = new double[n];
-  //All Parameters
-
-
-  // CaMtotDyad = new double[n];
-  // BtotDyad = new double[n];
-  // CaMKIItotDyad = new double[n];
-  // CaNtotDyad = new double[n];
-  // PP1totDyad = new double[n];
-  // CaMtotSL = new double[n];
-  // BtotSL = new double[n];
-  // CaMKIItotSL = new double[n];
-  // CaNtotSL = new double[n];
-  // PP1totSL = new double[n];
-  // CaMtotCyt = new double[n];
-  // BtotCyt = new double[n];
-  // CaMKIItotCyt = new double[n];
-  // CaNtotCyt = new double[n];
-  // PP1totCyt = new double[n];
-  // LCCtotDyad = new double[n];
-  // RyRtot = new double[n];
-  // PP1_dyad = new double[n];
-  // PP2A_dyad = new double[n];
-  // OA = new double[n];
-  // LCCtotSL = new double[n];
-  // PP1_SL = new double[n];
-  // PLBtot = new double[n];
-  // Ligtot = new double[n];
-  // LCCtotBA = new double[n];
-  // RyRtotBA = new double[n];
-  // PLBtotBA = new double[n];
-  // TnItotBA = new double[n];
-  // IKstotBA = new double[n];
-  // ICFTRtotBA = new double[n];
-  // PP1_PLBtot = new double[n];
-  // PLMtotBA = new double[n];
-  // MyototBA = new double[n];
-  // IKrtotBA = new double[n];
-  // IClCatotBA = new double[n];
-  // CKIIOE = new double[n];
-  // recoveryTime = new double[n];
-
   //CaM Differentials
-  dydt_CaMDyad = new double[15];
-  dydt_CaMSL = new double[15];
-  dydt_CaMCyt = new double[15];
-  dydt_CaMKII = new double[6];
+  dydt_CaMDyad = new double[15*n];
+  dydt_CaMSL = new double[15*n];
+  dydt_CaMCyt = new double[15*n];
+  dydt_CaMKII = new double[6*n];
+  dydt_BAR = new double[36*n];
 
   //CaM State Variables
   //Ca Fluxes from CaM_dyad
@@ -2599,16 +2730,72 @@ void CSubcell::allocate_memory_all_PTM_vars(int n){
   PP1_PLB_avail = new double[n];
 
   LCC_PKAp = new double[n];
-  LCC_CKdyadp = new double[n];
+  LCC_CKdyadp = new double[n]; //TODO this variable name is used twice, fix please
   LCC_CKslp = new double[n];
   RyR2809p = new double[n];
   RyR2815p = new double[n];
   PLBT17p = new double[n];
 
-
-  // LCC_CKdyadp = new double[n]; //Defined twice?
   RyR_CKp = new double[n];
   PLB_CKp = new double[n];
+
+  // //BAR// //
+  L = new double[n];
+  B1AR = new double[n];
+  Gs = new double[n];
+  B1AR_ACT = new double[n];
+  B1AR_S464 = new double[n];
+
+  B1AR_S301 = new double[n];
+  GsaGTPtot = new double[n];
+  GsaGDP = new double[n];
+  GsBy = new double[n];
+
+  GsaGTP = new double[n];
+  Fsk = new double[n];
+  AC = new double[n];
+  PDE = new double[n];
+  IBMX = new double[n];
+
+  cAMPtot = new double[n];
+  cAMP = new double[n];
+  PKAC_I = new double[n];
+  PKAC_II = new double[n];
+
+  PLBp = new double[n];
+  Inhib1ptot = new double[n];
+  Inhib1p = new double[n];
+  PP1 = new double[n];
+
+  LCCa_PKAp_whole = new double[n];
+  LCCb_PKAp_whole = new double[n];
+  RyR_PKAp_whole = new double[n];
+  TnI_PKAp_whole = new double[n];
+  IKs_PKAn = new double[n]; 
+  Yotiao_KCQN1 = new double[n]; 
+  IKs_PKAp_whole = new double[n];
+  ICFTR_PKAp_whole = new double[n];
+  PLM_PKAp_whole = new double[n];
+  Myo_PKAp_whole = new double[n];
+  IKr_PKAn = new double[n]; 
+  Yotiao_hERG = new double[n]; 
+  IKr_PKAp_whole = new double[n];
+  IClCa_PKAp_whole = new double[n];
+
+  LCCa_PKAp = new double[n];
+  LCCb_PKAp = new double[n];
+  PLB_PKAn = new double[n];
+  RyR_PKAp = new double[n];
+  TnI_PKAp = new double[n];
+  IKs_PKAp = new double[n];
+  ICFTR_PKAp = new double[n];
+  PLM_PKAp = new double[n];
+  Myo_PKAp = new double[n];
+  IKr_PKAp = new double[n];
+  IClCa_PKAp = new double[n];
+
+
+  RYR_multiplier = new double[n];
   // std::cout <<"EXITED allocate memory all PTM_vars" << std::endl;
 }
 
@@ -2616,6 +2803,7 @@ void CSubcell::allocate_memory_all_PTM_vars(int n){
 
 
 void CSubcell::init_const_parameters_PTM(){
+  // std::cout << "ENTERED init_const_parameters_PTM" << std::endl;
   // freq = 1.0;                 // [Hz] CHANGE DEPENDING ON FREQUENCY
   // cycleLength = 1e3/freq;     // [ms]
   CaMtotDyad = 418;             //[uM]
@@ -2675,13 +2863,16 @@ void CSubcell::init_const_parameters_PTM(){
 
   // For Recovery from inactivation of LCC
   recoveryTime = 10;  // initialize to smallest value
+
+  // std::cout << "EXITED init_const_parameters_PTM" << std::endl;
 }
 
 
 void CSubcell::init_state_variables_PTMs(int id){
-  // double *dydt_CaMDyad, *dydt_CaMSL, *dydt_CaMCyt;
-    // double *JCaCyt, *JCaSL, *JCaDyad;
+    // double *dydt_CaMDyad, *dydt_CaMSL, *dydt_CaMCyt;
+    // double *JCaCyt, *JCaSL, *JCaSLDyad;
 
+    // std::cout << "ENTERED init_state_variables_PTMs" << std::endl;
     //CaM_Dyad
     CaM_dyad[id]= 356.109460603695;
     Ca2CaM_dyad[id]= 5.97654735341164;
@@ -2734,9 +2925,9 @@ void CSubcell::init_state_variables_PTMs(int id){
     Ca2CaMCa4CaN_cyt[id]= 3.95696769885873e-07;
     Ca4CaMCa4CaN_cyt[id]= 7.89429746296487e-06;
 
-  //* * * * * CaM Variables * * * * * 
+    //* * * * * CaM Variables * * * * * //
 
-  //* * * * * CaMKII Variables * * * * *  
+    //* * * * * CaMKII Variables * * * * *  //
 
     //CaMKII State Variables
     
@@ -2747,14 +2938,72 @@ void CSubcell::init_state_variables_PTMs(int id){
     PLBT17p[id] = 0.4628;
     LCC_CKslp[id] = 1.90123528218208e-05;
 
-    CaMKIIactDyad[id] = CaMKIItotDyad*(Pb_dyad[id]+Pt_dyad[id]+Pt2_dyad[id]+Pa_dyad[id]); // Multiply total by fraction of activated CaMKII states (Pb, Pt, Pt2, Pa)
-    CaMKIIactSL[id] = CaMKIItotSL*(Pb_sl[id]+Pt_sl[id]+Pt2_sl[id]+Pa_sl[id]);
 
+    CaMKIIactDyad[id] = CaMKIItotDyad*(Pb_dyad[id]+Pt_dyad[id]+Pt2_dyad[id]+Pa_dyad[id]); // Multiply total by fraction of activated CaMKII states (Pb, Pt, Pt2, Pa)
+
+    
+
+    CaMKIIactSL[id] = CaMKIItotSL*(Pb_sl[id]+Pt_sl[id]+Pt2_sl[id]+Pa_sl[id]);
     PP1_PLB_avail[id] = 0.8819/PP1_PLBtot + .0091;  // Active PP1 near PLB / total PP1 conc + basal value
 
     LCC_CKdyadp[id] = LCC_CKdyadp[id]/LCCtotDyad;   //136 fractional CaMKII-dependent LCC dyad phosphorylation
     RyR_CKp[id] = RyR2815p[id]/RyRtot;           //138 fractional CaMKII-dependent RyR phosphorylation
     PLB_CKp[id] = PLBT17p[id]/PLBtot; 
+    //* * * * * CaMKII Variables * * * * *  
+
+    //* * * * * B-AR Variables * * * * *  //
+    L[id] = 0;
+    B1AR[id] = 0.0247551234189601;
+    Gs[id] = 3.82712905902435;
+    B1AR_ACT[id] = 0.0276260643946097;
+    B1AR_S464[id] = 1.47940139415962e-21;
+    B1AR_S301[id] = 0.000373935605630215;
+    GsaGTPtot[id] = 0.0574188195042173;
+    GsaGDP[id] = 0.000654316122780689;
+    GsBy[id] = 0.0580191356270164;
+    GsaGTP[id] = 0.0520107506131518;
+    Fsk[id] = 0;
+    AC[id] = 0.0415919311089345;
+    PDE[id] = 0.0360000000000000;
+    IBMX[id] = 0;
+    cAMPtot[id] = 0.486632223132263;
+    cAMP[id] = 0.0716671431739411;
+    PKAC_I[id] = 0.00827172716628298;
+    PKAC_II[id] = 0.00317804750275709;
+    PLBp[id] = 0.278595379571156;
+    Inhib1ptot[id] = 0.00807506817947479;
+    Inhib1p[id] = 9.14572037129325e-06;
+    PP1[id] = 0.881934077540897;
+    LCCa_PKAp_whole[id] = 0.000695895330926661;
+    LCCb_PKAp_whole[id] = 0.000821087078294546;
+    RyR_PKAp_whole[id] = 0.00329852374692194;
+    TnI_PKAp_whole[id] = 0.219146073024094;
+    IKs_PKAn[id] = 0.00153192920195564;
+    Yotiao_KCQN1[id] = 0.00153192920195564;
+    IKs_PKAp_whole[id] = 0.00274417781311398;
+    ICFTR_PKAp_whole[id] = 0.00405926811380601;
+    PLM_PKAp_whole[id] = 0.302091135992497;
+    Myo_PKAp_whole[id] = 0.219146073024094;
+    IKr_PKAn[id] = 0.00153192920195564;
+    Yotiao_hERG[id] = 0.00153192920195564;
+    IKr_PKAp_whole[id] = 0.00274417781311045;
+    IClCa_PKAp_whole[id] = 0.00405926811380601;
+
+    LCCa_PKAp[id] = LCCa_PKAp_whole[id]/LCCtotBA;
+    LCCb_PKAp[id] = LCCb_PKAp_whole[id]/LCCtotBA;
+    PLB_PKAn[id] = (PLBtotBA - PLBp[id])/PLBtotBA; // non-phosphorylated PLB targets
+    RyR_PKAp[id] = RyR_PKAp_whole[id]/RyRtotBA;
+    TnI_PKAp[id] = TnI_PKAp_whole[id]/TnItotBA;
+    IKs_PKAp[id] = IKs_PKAp_whole[id]/IKstotBA;
+    ICFTR_PKAp[id] = ICFTR_PKAp_whole[id]/ICFTRtotBA;
+    PLM_PKAp[id] = PLM_PKAp_whole[id]/PLMtotBA;
+    Myo_PKAp[id] = Myo_PKAp_whole[id]/MyototBA;
+    IKr_PKAp[id] = IKr_PKAp_whole[id]/IKrtotBA;
+    IClCa_PKAp[id] = IClCa_PKAp_whole[id]/IClCatotBA;
+
+    //* * * * * B-AR Variables * * * * *  //
+
+    // std::cout << "EXITED init_state_variables_PTMs" << std::endl;
 }
 
 
@@ -2892,21 +3141,55 @@ void CSubcell::calc_dydt_CaM_Dyad_ODEs(int id){
   double dPt2 = 1e-3*(rcnCKtt2-rcnCKt2a-rcnCKt2b2);     // Pt2_dyad[id]
   double dPa = 1e-3*(rcnCKta+rcnCKt2a-rcnCKai);       // Pa_dyad[id]
 
+  // if(id == 50){
+
+        
+  //       std::cout << "cp["       << id <<  "]: " << "\t" << cp[id] << std::endl;
+  //       std::cout << "dPb["       << id <<  "]: " << "\t" << dPb << std::endl;
+  //       std::cout << "rcnCKib["       << id <<  "]: " << "\t" << rcnCKib << std::endl;
+  //       std::cout << "rcnCKb2b["       << id <<  "]: " << "\t" << rcnCKb2b <<   std::endl;
+  //       std::cout << "rcnCKbt["       << id <<  "]: " << "\t" << rcnCKbt << std::endl;
+
+
+  //   }
+
   // CaN equations
   double dCa4CaN = 1e-3*(rcnCa4CaN - rcn0CaN - rcn2CaN - rcn4CaN);                       // Ca4CaN_dyad[id]
   double dCaMCa4CaN = 1e-3*(rcn0CaN - rcn02CaN);           // CaMCa4CaN_dyad[id]
   double dCa2CaMCa4CaN = 1e-3*(rcn2CaN+rcn02CaN-rcn24CaN);    // Ca2CaMCa4CaN_dyad[id]
   double dCa4CaMCa4CaN = 1e-3*(rcn4CaN+rcn24CaN);             // Ca4CaMCa4CaN_dyad[id]
 
-  double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
+  // double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
   
   //Assign dydt
-  dydt_CaMDyad = dydt;
+  // dydt_CaMDyad = dydt; //dydt for CaMDyad
+  // for(int i=0;i<15;i++){
+  //   dydt_CaMDyad[(id*15)+i]=dydt[i];
+  // }
 
   // write to global variables for adjusting Ca dyad buffering in EC coupling model
-  double JCa = 1e-3*(2*CaMKIItotDyad*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
+  JCaDyad[id] = 1e-3*(2*CaMKIItotDyad*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
 
-  JCaDyad[id] = JCa;
+  dydt_CaMDyad[(id*15)+  0] = dCaM;
+  dydt_CaMDyad[(id*15)+  1] = dCa2CaM;
+  dydt_CaMDyad[(id*15)+  2] = dCa4CaM;
+  dydt_CaMDyad[(id*15)+  3] = dCaMB;
+  dydt_CaMDyad[(id*15)+  4] = dCa2CaMB;
+  dydt_CaMDyad[(id*15)+  5] = dCa4CaMB;
+  dydt_CaMDyad[(id*15)+  6] = dPb2;
+  dydt_CaMDyad[(id*15)+  7] = dPb;
+  dydt_CaMDyad[(id*15)+  8] = dPt;
+  dydt_CaMDyad[(id*15)+  9] = dPt2;
+  dydt_CaMDyad[(id*15)+ 10] = dPa;
+  
+  // if(id%186 == 0){
+  //   std::cout << "id: " << id << ", in Calc function dydt_CaMDyad[(id*15)+ 10]: " << dydt_CaMDyad[(id*15)+ 10] << std::endl;
+  // }
+
+  dydt_CaMDyad[(id*15)+ 11] = dCa4CaN;
+  dydt_CaMDyad[(id*15)+ 12] = dCaMCa4CaN;
+  dydt_CaMDyad[(id*15)+ 13] = dCa2CaMCa4CaN;
+  dydt_CaMDyad[(id*15)+ 14] = dCa4CaMCa4CaN; 
 }
 void CSubcell::calc_dydt_CaM_SL_ODEs(int id){
   double K = 135; // mM
@@ -2995,32 +3278,32 @@ void CSubcell::calc_dydt_CaM_SL_ODEs(int id){
   double k42can = k20/2508;
 
   // CaM_sl Reaction fluxes
-  double rcn02 = k02*pow(cp[id],2)*CaM_sl[id] - k20*Ca2CaM_sl[id];
-  double rcn24 = k24*pow(cp[id],2)*Ca2CaM_sl[id] - k42*Ca4CaM_sl[id];
+  double rcn02 = k02*pow(cs[id],2)*CaM_sl[id] - k20*Ca2CaM_sl[id];
+  double rcn24 = k24*pow(cs[id],2)*Ca2CaM_sl[id] - k42*Ca4CaM_sl[id];
   // CaM_sl buffer fluxes
   double B = BtotSL - CaMB_sl[id] - Ca2CaMB_sl[id] - Ca4CaMB_sl[id];
-  double rcn02B = k02B*pow(cp[id],2)*CaMB_sl[id] - k20B*Ca2CaMB_sl[id];
-  double rcn24B = k24B*pow(cp[id],2)*Ca2CaMB_sl[id] - k42B*Ca4CaMB_sl[id];
+  double rcn02B = k02B*pow(cs[id],2)*CaMB_sl[id] - k20B*Ca2CaMB_sl[id];
+  double rcn24B = k24B*pow(cs[id],2)*Ca2CaMB_sl[id] - k42B*Ca4CaMB_sl[id];
   double rcn0B = k0Bon*CaM_sl[id]*B - k0Boff*CaMB_sl[id];
   double rcn2B = k2Bon*Ca2CaM_sl[id]*B - k2Boff*Ca2CaMB_sl[id];
   double rcn4B = k4Bon*Ca4CaM_sl[id]*B - k4Boff*Ca4CaMB_sl[id];
   // CaN reaction fluxes 
   double Ca2CaN = CaNtotSL - Ca4CaN_sl[id] - CaMCa4CaN_sl[id] - Ca2CaMCa4CaN_sl[id] - Ca4CaMCa4CaN_sl[id];
-  double rcnCa4CaN = kcanCaon*pow(cp[id],2)*Ca2CaN - kcanCaoff*Ca4CaN_sl[id];
-  double rcn02CaN = k02can*pow(cp[id],2)*CaMCa4CaN_sl[id] - k20can*Ca2CaMCa4CaN_sl[id]; 
-  double rcn24CaN = k24can*pow(cp[id],2)*Ca2CaMCa4CaN_sl[id] - k42can*Ca4CaMCa4CaN_sl[id];
+  double rcnCa4CaN = kcanCaon*pow(cs[id],2)*Ca2CaN - kcanCaoff*Ca4CaN_sl[id];
+  double rcn02CaN = k02can*pow(cs[id],2)*CaMCa4CaN_sl[id] - k20can*Ca2CaMCa4CaN_sl[id]; 
+  double rcn24CaN = k24can*pow(cs[id],2)*Ca2CaMCa4CaN_sl[id] - k42can*Ca4CaMCa4CaN_sl[id];
   double rcn0CaN = kcanCaM0on*CaM_sl[id]*Ca4CaN_sl[id] - kcanCaM0off*CaMCa4CaN_sl[id];
   double rcn2CaN = kcanCaM2on*Ca2CaM_sl[id]*Ca4CaN_sl[id] - kcanCaM2off*Ca2CaMCa4CaN_sl[id];
   double rcn4CaN = kcanCaM4on*Ca4CaM_sl[id]*Ca4CaN_sl[id] - kcanCaM4off*Ca4CaMCa4CaN_sl[id];
   // CaMKII reaction fluxes
   double Pi = 1 - Pb2_sl[id] - Pb_sl[id] - Pt_sl[id] - Pt2_sl[id] - Pa_sl[id];
   double rcnCKib2 = kib2*Ca2CaM_sl[id]*Pi - kb2i*Pb2_sl[id];
-  double rcnCKb2b = kb24*pow(cp[id],2)*Pb2_sl[id] - kb42*Pb_sl[id];
+  double rcnCKb2b = kb24*pow(cs[id],2)*Pb2_sl[id] - kb42*Pb_sl[id];
   double rcnCKib = kib*Ca4CaM_sl[id]*Pi - kbi*Pb_sl[id];
   double T = Pb_sl[id] + Pt_sl[id] + Pt2_sl[id] + Pa_sl[id];
   double kbt = 0.055*T + .0074*pow(T,2) + 0.015*pow(T,3);
   double rcnCKbt = kbt*Pb_sl[id] - kpp1*PP1totSL*Pt_sl[id]/(Kmpp1+CaMKIItotSL*Pt_sl[id]);
-  double rcnCKtt2 = kt42*Pt_sl[id] - kt24*pow(cp[id],2)*Pt2_sl[id];
+  double rcnCKtt2 = kt42*Pt_sl[id] - kt24*pow(cs[id],2)*Pt2_sl[id];
   double rcnCKta = kta*Pt_sl[id] - kat*Ca4CaM_sl[id]*Pa_sl[id];
   double rcnCKt2a = kt2a*Pt2_sl[id] - kat2*Ca2CaM_sl[id]*Pa_sl[id];
   double rcnCKt2b2 = kpp1*PP1totSL*Pt2_sl[id]/(Kmpp1+CaMKIItotSL*Pt2_sl[id]);
@@ -3047,15 +3330,28 @@ void CSubcell::calc_dydt_CaM_SL_ODEs(int id){
   double dCa2CaMCa4CaN = 1e-3*(rcn2CaN+rcn02CaN-rcn24CaN);    // Ca2CaMCa4CaN_sl[id]
   double dCa4CaMCa4CaN = 1e-3*(rcn4CaN+rcn24CaN);             // Ca4CaMCa4CaN_sl[id]
 
-  double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
+  // double dydt[15]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
+  
+  
+  // write to global variables for adjusting Ca dyad buffering in EC coupling model
+  JCaSL[id] = 1e-3*(2*CaMKIItotSL*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
   
   //Assign dydt
-  dydt_CaMSL = dydt;
-
-  // write to global variables for adjusting Ca dyad buffering in EC coupling model
-  double JCa = 1e-3*(2*CaMKIItotSL*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
-
-  JCaSL[id] = JCa;
+  dydt_CaMSL[(id*15)+  0] = dCaM;
+  dydt_CaMSL[(id*15)+  1] = dCa2CaM;
+  dydt_CaMSL[(id*15)+  2] = dCa4CaM;
+  dydt_CaMSL[(id*15)+  3] = dCaMB;
+  dydt_CaMSL[(id*15)+  4] = dCa2CaMB;
+  dydt_CaMSL[(id*15)+  5] = dCa4CaMB;
+  dydt_CaMSL[(id*15)+  6] = dPb2;
+  dydt_CaMSL[(id*15)+  7] = dPb;
+  dydt_CaMSL[(id*15)+  8] = dPt;
+  dydt_CaMSL[(id*15)+  9] = dPt2;
+  dydt_CaMSL[(id*15)+ 10] = dPa;
+  dydt_CaMSL[(id*15)+ 11] = dCa4CaN;
+  dydt_CaMSL[(id*15)+ 12] = dCaMCa4CaN;
+  dydt_CaMSL[(id*15)+ 13] = dCa2CaMCa4CaN;
+  dydt_CaMSL[(id*15)+ 14] = dCa4CaMCa4CaN; 
 }
 void CSubcell::calc_dydt_CaM_Cyt_ODEs(int id){
   double K = 135; // mM
@@ -3144,32 +3440,32 @@ void CSubcell::calc_dydt_CaM_Cyt_ODEs(int id){
   double k42can = k20/2508;
 
   // CaM_cyt Reaction fluxes
-  double rcn02 = k02*pow(cp[id],2)*CaM_cyt[id] - k20*Ca2CaM_cyt[id];
-  double rcn24 = k24*pow(cp[id],2)*Ca2CaM_cyt[id] - k42*Ca4CaM_cyt[id];
+  double rcn02 = k02*pow(ci[id],2)*CaM_cyt[id] - k20*Ca2CaM_cyt[id];
+  double rcn24 = k24*pow(ci[id],2)*Ca2CaM_cyt[id] - k42*Ca4CaM_cyt[id];
   // CaM_cyt buffer fluxes
   double B = BtotCyt - CaMB_cyt[id] - Ca2CaMB_cyt[id] - Ca4CaMB_cyt[id];
-  double rcn02B = k02B*pow(cp[id],2)*CaMB_cyt[id] - k20B*Ca2CaMB_cyt[id];
-  double rcn24B = k24B*pow(cp[id],2)*Ca2CaMB_cyt[id] - k42B*Ca4CaMB_cyt[id];
+  double rcn02B = k02B*pow(ci[id],2)*CaMB_cyt[id] - k20B*Ca2CaMB_cyt[id];
+  double rcn24B = k24B*pow(ci[id],2)*Ca2CaMB_cyt[id] - k42B*Ca4CaMB_cyt[id];
   double rcn0B = k0Bon*CaM_cyt[id]*B - k0Boff*CaMB_cyt[id];
   double rcn2B = k2Bon*Ca2CaM_cyt[id]*B - k2Boff*Ca2CaMB_cyt[id];
   double rcn4B = k4Bon*Ca4CaM_cyt[id]*B - k4Boff*Ca4CaMB_cyt[id];
   // CaN reaction fluxes 
   double Ca2CaN = CaNtotCyt - Ca4CaN_cyt[id] - CaMCa4CaN_cyt[id] - Ca2CaMCa4CaN_cyt[id] - Ca4CaMCa4CaN_cyt[id];
-  double rcnCa4CaN = kcanCaon*pow(cp[id],2)*Ca2CaN - kcanCaoff*Ca4CaN_cyt[id];
-  double rcn02CaN = k02can*pow(cp[id],2)*CaMCa4CaN_cyt[id] - k20can*Ca2CaMCa4CaN_cyt[id]; 
-  double rcn24CaN = k24can*pow(cp[id],2)*Ca2CaMCa4CaN_cyt[id] - k42can*Ca4CaMCa4CaN_cyt[id];
+  double rcnCa4CaN = kcanCaon*pow(ci[id],2)*Ca2CaN - kcanCaoff*Ca4CaN_cyt[id];
+  double rcn02CaN = k02can*pow(ci[id],2)*CaMCa4CaN_cyt[id] - k20can*Ca2CaMCa4CaN_cyt[id]; 
+  double rcn24CaN = k24can*pow(ci[id],2)*Ca2CaMCa4CaN_cyt[id] - k42can*Ca4CaMCa4CaN_cyt[id];
   double rcn0CaN = kcanCaM0on*CaM_cyt[id]*Ca4CaN_cyt[id] - kcanCaM0off*CaMCa4CaN_cyt[id];
   double rcn2CaN = kcanCaM2on*Ca2CaM_cyt[id]*Ca4CaN_cyt[id] - kcanCaM2off*Ca2CaMCa4CaN_cyt[id];
   double rcn4CaN = kcanCaM4on*Ca4CaM_cyt[id]*Ca4CaN_cyt[id] - kcanCaM4off*Ca4CaMCa4CaN_cyt[id];
   // CaMKII reaction fluxes
   double Pi = 1 - Pb2_cyt[id] - Pb_cyt[id] - Pt_cyt[id] - Pt2_cyt[id] - Pa_cyt[id];
   double rcnCKib2 = kib2*Ca2CaM_cyt[id]*Pi - kb2i*Pb2_cyt[id];
-  double rcnCKb2b = kb24*pow(cp[id],2)*Pb2_cyt[id] - kb42*Pb_cyt[id];
+  double rcnCKb2b = kb24*pow(ci[id],2)*Pb2_cyt[id] - kb42*Pb_cyt[id];
   double rcnCKib = kib*Ca4CaM_cyt[id]*Pi - kbi*Pb_cyt[id];
   double T = Pb_cyt[id] + Pt_cyt[id] + Pt2_cyt[id] + Pa_cyt[id];
   double kbt = 0.055*T + .0074*pow(T,2) + 0.015*pow(T,3);
   double rcnCKbt = kbt*Pb_cyt[id] - kpp1*PP1totCyt*Pt_cyt[id]/(Kmpp1+CaMKIItotCyt*Pt_cyt[id]);
-  double rcnCKtt2 = kt42*Pt_cyt[id] - kt24*pow(cp[id],2)*Pt2_cyt[id];
+  double rcnCKtt2 = kt42*Pt_cyt[id] - kt24*pow(ci[id],2)*Pt2_cyt[id];
   double rcnCKta = kta*Pt_cyt[id] - kat*Ca4CaM_cyt[id]*Pa_cyt[id];
   double rcnCKt2a = kt2a*Pt2_cyt[id] - kat2*Ca2CaM_cyt[id]*Pa_cyt[id];
   double rcnCKt2b2 = kpp1*PP1totCyt*Pt2_cyt[id]/(Kmpp1+CaMKIItotCyt*Pt2_cyt[id]);
@@ -3190,79 +3486,100 @@ void CSubcell::calc_dydt_CaM_Cyt_ODEs(int id){
   double dPt2 = 1e-3*(rcnCKtt2-rcnCKt2a-rcnCKt2b2);     // Pt2_cyt[id]
   double dPa = 1e-3*(rcnCKta+rcnCKt2a-rcnCKai);       // Pa_cyt[id]
 
+
+
   // CaN equations
   double dCa4CaN = 1e-3*(rcnCa4CaN - rcn0CaN - rcn2CaN - rcn4CaN);                       // Ca4CaN_cyt[id]
   double dCaMCa4CaN = 1e-3*(rcn0CaN - rcn02CaN);           // CaMCa4CaN_cyt[id]
   double dCa2CaMCa4CaN = 1e-3*(rcn2CaN+rcn02CaN-rcn24CaN);    // Ca2CaMCa4CaN_cyt[id]
   double dCa4CaMCa4CaN = 1e-3*(rcn4CaN+rcn24CaN);             // Ca4CaMCa4CaN_cyt[id]
 
-  double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
+  // double dydt[15]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
   
   //Assign dydt
-  dydt_CaMCyt = dydt;
+
+  // for(int i=0;i<15;i++){
+  //   dydt_CaMCyt[(id*15)+i]=dydt[i];
+  // }
 
   // write to global variables for adjusting Ca dyad buffering in EC coupling model
-  double JCa = 1e-3*(2*CaMKIItotCyt*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
+  JCaCyt[id] = 1e-3*(2*CaMKIItotCyt*(rcnCKtt2-rcnCKb2b) - 2*(rcn02+rcn24+rcn02B+rcn24B+rcnCa4CaN+rcn02CaN+rcn24CaN)); // [uM/msec]
 
-  JCaCyt[id] = JCa;
+  dydt_CaMCyt[(id*15)+  0] = dCaM;
+  dydt_CaMCyt[(id*15)+  1] = dCa2CaM;
+  dydt_CaMCyt[(id*15)+  2] = dCa4CaM;
+  dydt_CaMCyt[(id*15)+  3] = dCaMB;
+  dydt_CaMCyt[(id*15)+  4] = dCa2CaMB;
+  dydt_CaMCyt[(id*15)+  5] = dCa4CaMB;
+  dydt_CaMCyt[(id*15)+  6] = dPb2;
+  dydt_CaMCyt[(id*15)+  7] = dPb;
+  dydt_CaMCyt[(id*15)+  8] = dPt;
+  dydt_CaMCyt[(id*15)+  9] = dPt2;
+  dydt_CaMCyt[(id*15)+ 10] = dPa;
+  dydt_CaMCyt[(id*15)+ 11] = dCa4CaN;
+  dydt_CaMCyt[(id*15)+ 12] = dCaMCa4CaN;
+  dydt_CaMCyt[(id*15)+ 13] = dCa2CaMCa4CaN;
+  dydt_CaMCyt[(id*15)+ 14] = dCa4CaMCa4CaN;
+
 }
 void CSubcell::solve_ODE_CaM(int id){
   // double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
   
   //CaM_dyad Cytosol
-    CaM_cyt[id] += dydt_CaMCyt[0]*dt;
-    Ca2CaM_cyt[id] += dydt_CaMCyt[1]*dt;
-    Ca4CaM_cyt[id] += dydt_CaMCyt[2]*dt;
-    CaMB_cyt[id] += dydt_CaMCyt[3]*dt;
-    Ca2CaMB_cyt[id] += dydt_CaMCyt[4]*dt;
-    Ca4CaMB_cyt[id] += dydt_CaMCyt[5]*dt;
-    Pb2_cyt[id] += dydt_CaMCyt[6]*dt;
-    Pb_cyt[id] += dydt_CaMCyt[7]*dt;
-    Pt_cyt[id] += dydt_CaMCyt[8]*dt;
-    Pt2_cyt[id] += dydt_CaMCyt[9]*dt;
-    Pa_cyt[id] += dydt_CaMCyt[10]*dt;
-    Ca4CaN_cyt[id] += dydt_CaMCyt[11]*dt;
-    CaMCa4CaN_cyt[id] += dydt_CaMCyt[12]*dt;
-    Ca2CaMCa4CaN_cyt[id] += dydt_CaMCyt[13]*dt;
-    Ca4CaMCa4CaN_cyt[id] += dydt_CaMCyt[14]*dt;
+    CaM_cyt[id]           += dydt_CaMCyt[(id*15) +  0]*dt;
+    Ca2CaM_cyt[id]        += dydt_CaMCyt[(id*15) +  1]*dt;
+    Ca4CaM_cyt[id]        += dydt_CaMCyt[(id*15) +  2]*dt;
+    CaMB_cyt[id]          += dydt_CaMCyt[(id*15) +  3]*dt;
+    Ca2CaMB_cyt[id]       += dydt_CaMCyt[(id*15) +  4]*dt;
+    Ca4CaMB_cyt[id]       += dydt_CaMCyt[(id*15) +  5]*dt;
+    Pb2_cyt[id]           += dydt_CaMCyt[(id*15) +  6]*dt;
+    Pb_cyt[id]            += dydt_CaMCyt[(id*15) +  7]*dt;
+    Pt_cyt[id]            += dydt_CaMCyt[(id*15) +  8]*dt;
+    Pt2_cyt[id]           += dydt_CaMCyt[(id*15) +  9]*dt;
+    Pa_cyt[id]            += dydt_CaMCyt[(id*15) + 10]*dt;
+    Ca4CaN_cyt[id]        += dydt_CaMCyt[(id*15) + 11]*dt;
+    CaMCa4CaN_cyt[id]     += dydt_CaMCyt[(id*15) + 12]*dt;
+    Ca2CaMCa4CaN_cyt[id]  += dydt_CaMCyt[(id*15) + 13]*dt;
+    Ca4CaMCa4CaN_cyt[id]  += dydt_CaMCyt[(id*15) + 14]*dt;
   //CaM_dyad Sarcolemmal
 
-    CaM_sl[id] += dydt_CaMSL[0]*dt;
-    Ca2CaM_sl[id] += dydt_CaMSL[1]*dt;
-    Ca4CaM_sl[id] += dydt_CaMSL[2]*dt;
-    CaMB_sl[id] += dydt_CaMSL[3]*dt;
-    Ca2CaMB_sl[id] += dydt_CaMSL[4]*dt;
-    Ca4CaMB_sl[id] += dydt_CaMSL[5]*dt;
-    Pb2_sl[id] += dydt_CaMSL[6]*dt;
-    Pb_sl[id] += dydt_CaMSL[7]*dt;
-    Pt_sl[id] += dydt_CaMSL[8]*dt;
-    Pt2_sl[id] += dydt_CaMSL[9]*dt;
-    Pa_sl[id] += dydt_CaMSL[10]*dt;
-    Ca4CaN_sl[id] += dydt_CaMSL[11]*dt;
-    CaMCa4CaN_sl[id] += dydt_CaMSL[12]*dt;
-    Ca2CaMCa4CaN_sl[id] += dydt_CaMSL[13]*dt;
-    Ca4CaMCa4CaN_sl[id] += dydt_CaMSL[14]*dt;
+    CaM_sl[id]            += dydt_CaMSL[(id*15) +  0]*dt;
+    Ca2CaM_sl[id]         += dydt_CaMSL[(id*15) +  1]*dt;
+    Ca4CaM_sl[id]         += dydt_CaMSL[(id*15) +  2]*dt;
+    CaMB_sl[id]           += dydt_CaMSL[(id*15) +  3]*dt;
+    Ca2CaMB_sl[id]        += dydt_CaMSL[(id*15) +  4]*dt;
+    Ca4CaMB_sl[id]        += dydt_CaMSL[(id*15) +  5]*dt;
+    Pb2_sl[id]            += dydt_CaMSL[(id*15) +  6]*dt;
+    Pb_sl[id]             += dydt_CaMSL[(id*15) +  7]*dt;
+    Pt_sl[id]             += dydt_CaMSL[(id*15) +  8]*dt;
+    Pt2_sl[id]            += dydt_CaMSL[(id*15) +  9]*dt;
+    Pa_sl[id]             += dydt_CaMSL[(id*15) + 10]*dt;
+    Ca4CaN_sl[id]         += dydt_CaMSL[(id*15) + 11]*dt;
+    CaMCa4CaN_sl[id]      += dydt_CaMSL[(id*15) + 12]*dt;
+    Ca2CaMCa4CaN_sl[id]   += dydt_CaMSL[(id*15) + 13]*dt;
+    Ca4CaMCa4CaN_sl[id]   += dydt_CaMSL[(id*15) + 14]*dt;
   
   //CaM_dyad Dyad/Cleft space
-    CaM_dyad[id] += dydt_CaMDyad[0]*dt;
-    Ca2CaM_dyad[id] += dydt_CaMDyad[1]*dt;
-    Ca4CaM_dyad[id] += dydt_CaMDyad[2]*dt;
-    CaMB_dyad[id] += dydt_CaMDyad[3]*dt;
-    Ca2CaMB_dyad[id] += dydt_CaMDyad[4]*dt;
-    Ca4CaMB_dyad[id] += dydt_CaMDyad[5]*dt;
-    Pb2_dyad[id] += dydt_CaMDyad[6]*dt;
-    Pb_dyad[id] += dydt_CaMDyad[7]*dt;
-    Pt_dyad[id] += dydt_CaMDyad[8]*dt;
-    Pt2_dyad[id] += dydt_CaMDyad[9]*dt;
-    Pa_dyad[id] += dydt_CaMDyad[10]*dt;
-    Ca4CaN_dyad[id] += dydt_CaMDyad[11]*dt;
-    CaMCa4CaN_dyad[id] += dydt_CaMDyad[12]*dt;
-    Ca2CaMCa4CaN_dyad[id] += dydt_CaMDyad[13]*dt;
-    Ca4CaMCa4CaN_dyad[id] += dydt_CaMDyad[14]*dt;
+    CaM_dyad[id]          += dydt_CaMDyad[(id*15)+  0]*dt;
+    Ca2CaM_dyad[id]       += dydt_CaMDyad[(id*15)+  1]*dt;
+    Ca4CaM_dyad[id]       += dydt_CaMDyad[(id*15)+  2]*dt;
+    CaMB_dyad[id]         += dydt_CaMDyad[(id*15)+  3]*dt;
+    Ca2CaMB_dyad[id]      += dydt_CaMDyad[(id*15)+  4]*dt;
+    Ca4CaMB_dyad[id]      += dydt_CaMDyad[(id*15)+  5]*dt;
+    Pb2_dyad[id]          += dydt_CaMDyad[(id*15)+  6]*dt;
+    Pb_dyad[id]           += dydt_CaMDyad[(id*15)+  7]*dt;
+    Pt_dyad[id]           += dydt_CaMDyad[(id*15)+  8]*dt;
+    Pt2_dyad[id]          += dydt_CaMDyad[(id*15)+  9]*dt;
+    Pa_dyad[id]           += dydt_CaMDyad[(id*15)+ 10]*dt;
+    // if(id%186 == 0){
+    //   std::cout << "id: " << id << ", in SOLVE_ODE_CAM dydt_CaMDyad[(id*15)+ 10]: " << dydt_CaMDyad[(id*15)+ 10] << std::endl;
+    // }
+    Ca4CaN_dyad[id]       += dydt_CaMDyad[(id*15)+ 11]*dt;
+    CaMCa4CaN_dyad[id]    += dydt_CaMDyad[(id*15)+ 12]*dt;
+    Ca2CaMCa4CaN_dyad[id] += dydt_CaMDyad[(id*15)+ 13]*dt;
+    Ca4CaMCa4CaN_dyad[id] += dydt_CaMDyad[(id*15)+ 14]*dt;
 
 }
-
-
 void CSubcell::calc_dydt_CaMKII_ODEs(int id)
   {
   //// Description of state variables
@@ -3355,20 +3672,521 @@ void CSubcell::calc_dydt_CaMKII_ODEs(int id)
   double PLB_DEPHOS = (k_pp1PLB*PP1_PLB*PLBT17p[id])/(KmPP1_PLB+PLBT17p[id])*OA_PP1;
   double dPLBT17p = PLB_PHOS - PLB_DEPHOS; 
 
+  
+  // double dydt[6]={dLCC_PKAp*10e-3, dLCC_CKdyadp*10e-3, dRyR2809p*10e-3, dRyR2815p*10e-3,dPLBT17p*10e-3, dLCC_CKslp*10e-3};  // Convert to uM/ms
+
+  // dydt_CaMKII = dydt;
+  // for(int i=0;i<6;i++){
+  //   dydt_CaMKII[(id*6)+i] = dydt[i];
+  // }
+
   //// Collect ODEs and convert to uM/ms
-  double dydt[6]={dLCC_PKAp*10e-3, dLCC_CKdyadp*10e-3, dRyR2809p*10e-3, dRyR2815p*10e-3,dPLBT17p*10e-3, dLCC_CKslp*10e-3};  // Convert to uM/ms
+  dydt_CaMKII[(id*6) + 0] = dLCC_PKAp*1e-3;
+  dydt_CaMKII[(id*6) + 1] = dLCC_CKdyadp*1e-3;
+  dydt_CaMKII[(id*6) + 2] = dRyR2809p*1e-3;
+  dydt_CaMKII[(id*6) + 3] = dRyR2815p*1e-3;
+  dydt_CaMKII[(id*6) + 4] = dPLBT17p*1e-3;
+  dydt_CaMKII[(id*6) + 5] = dLCC_CKslp*1e-3;
 
-  dydt_CaMKII = dydt;
+  // if(id == 50){
+  //   if(dRyR2815p*1e-3 > 1 || dRyR2815p*1e-3 < -1 ){
+  //     std::cout << "WARNING: dRyR2815p is blowing up" << std::endl;
+  //    }
 
+
+  //     std::cout << "RyR2815n["       << id <<  "]: " << "\t" << RyR2815n << std::endl;
+  //     std::cout << "CaMKIIactDyad["       << id <<  "]: " << "\t" << CaMKIIactDyad[id] << std::endl;
+  //     std::cout << "RyR_BASAL["       << id <<  "]: " << "\t" << RyR_BASAL << std::endl;
+  //     std::cout << "RyR_PHOS["        << id <<  "]: " << "\t" << RyR_PHOS << std::endl;
+  //     std::cout << "RyR_PP1_DEPHOS["  << id <<  "]: " << "\t" << RyR_PP1_DEPHOS << std::endl;
+  //     std::cout << "RyR_PP2A_DEPHOS[" << id <<  "]: " << "\t" << RyR_PP2A_DEPHOS << std::endl;
+
+  //     std::cout << "dLCC_CKdyadp["       << id <<  "]: " << "\t" << dLCC_CKdyadp << std::endl;
+
+  // }
 }
 
 void CSubcell::solve_ODE_CaMKII(int id){
-  LCC_PKAp[id] += dydt_CaMKII[0]*dt; //unused
-  LCC_CKdyadp[id] += dydt_CaMKII[1]*dt;
-  RyR2809p[id] += dydt_CaMKII[2]*dt; //unused
-  RyR2815p[id] += dydt_CaMKII[3]*dt;
-  PLBT17p[id] += dydt_CaMKII[4]*dt;
-  LCC_CKslp[id] += dydt_CaMKII[5]*dt;
+  LCC_PKAp[id]    += dydt_CaMKII[(id*6)+0]*dt; //unused
+  LCC_CKdyadp[id] += dydt_CaMKII[(id*6)+1]*dt;
+  RyR2809p[id]    += dydt_CaMKII[(id*6)+2]*dt; //unused
+  RyR2815p[id]    += dydt_CaMKII[(id*6)+3]*dt;
+  PLBT17p[id]     += dydt_CaMKII[(id*6)+4]*dt;
+  LCC_CKslp[id]   += dydt_CaMKII[(id*6)+5]*dt;
+}
+
+void CSubcell::calc_dydt_BAR_ODEs(int id){
+  // Negroni et al model - PKA module
+
+  //Matlab State Variables 
+  // y(1) = L;
+  // y(2) = B1AR;
+  // y(3) = Gs;
+  // y(4) = B1AR_ACT;
+  // y(5) = B1AR_S464;
+  // y(6) = B1AR_S301;
+  // y(7) = GsaGTPtot;
+  // y(8) = GsaGDP;
+  // y(9) = GsBy;
+  // y(10) = GsaGTP;
+  // y(11) = Fsk;
+  // y(12) = AC;
+  // y(13) = PDE;
+  // y(14) = IBMX;
+  // y(15) = cAMPtot;
+  // y(16) = cAMP;
+  // y(17) = PKAC_I;
+  // y(18) = PKAC_II;
+  // y(19) = PLBp;
+  // y(20) = Inhib1ptot;
+  // y(21) = Inhib1p;
+  // y(22) = PP1;
+  // y(23) = LCCa_PKAp_whole;
+  // y(24) = LCCb_PKAp_whole;
+  // y(25) = RyR_PKAp_whole;
+  // y(26) = TnI_PKAp_whole;
+  // y(27) = IKs_PKAn;
+  // y(28) = Yotiao_KCQN1;
+  // y(29) = IKs_PKAp_whole;
+  // y(30) = ICFTR_PKAp_whole;
+  // y(31) = PLM_PKAp_whole;
+  // y(32) = Myo_PKAp_whole;
+  // y(33) = IKr_PKAn;
+  // y(34) = Yotiao_hERG;
+  // y(35) = IKr_PKAp_whole;
+  // y(36) = IClCa_PKAp_whole;
+
+
+  //// Parameters
+  //// ----- Signaling model parameters -------
+  // b-AR/Gs module
+  double Ltotmax = Ligtot;    // Ltotmax   [uM] ** apply agonist concentration here **
+  double sumb1AR = 0.028;   // sumb1AR   [uM]
+  double Gstot = 3.83;    // Gstot     [uM]
+  double Kl = 0.285;   // Kl        [uM]
+  double Kr = 0.062;   // Kr        [uM]
+  double Kc = 33.0;    // Kc        [uM]
+  double k_barkp = 1.1e-3;  // k_barkp   [1/sec]
+  double k_barkm = 2.2e-3;  // k_barkm   [1/sec]
+  double k_pkap = 3.6e-3;  // k_pkap    [1/sec/uM]
+  double k_pkam = 2.2e-3; // k_pkam    [1/sec]
+  double k_gact = 16.0;   // k_gact    [1/sec]
+  double k_hyd = 0.8;    // k_hyd     [1/sec]
+  double k_reassoc = 1.21e3; // k_reassoc [1/sec/uM]
+  // cAMP module
+  double AC_tot = 0.047;  // AC_tot    [uM]
+  double ATP = 5.0e3;  // ATP       [uM]
+  double PDE3tot = 0.036;  // PDE3tot   [uM] // Changed from .06 to .036
+  double PDE4tot = 0.036;  // PDE4tot   [uM]
+  double IBMXtot = 0.0;    // IBMXtot   [uM]
+  double Fsktot = 0.0;    // Fsktot    [uM] (10 uM when used)
+  double k_ac_basal = 0.2;    // k_ac_basal[1/sec]
+  double k_ac_gsa = 8.5;    // k_ac_gsa  [1/sec]
+  double k_ac_fsk = 7.3;    // k_ac_fsk  [1/sec]
+  double Km_basal = 1.03e3; // Km_basal  [uM]
+  double Km_gsa = 315.0;  // Km_gsa    [uM]
+  double Km_fsk = 860.0;  // Km_fsk    [uM]
+  double Kgsa = 0.4;    // Kgsa      [uM]
+  double Kfsk = 44.0;   // Kfsk      [uM]
+  double k_pde3 = 3.5;    // k_pde3    [1/sec]
+  double Km_pde3 = 0.15;   // Km_pde3   [uM]
+  double k_pde4 = 5.0;    // k_pde4    [1/sec]
+  double Km_pde4 = 1.3;    // Km_pde4   [uM]
+  double Ki_ibmx = 30.0;   // Ki_ibmx   [uM]
+  // PKA module
+  double PKAItot = 0.46;   // PKAItot   [uM]
+  double PKAIItot = 0.084;  // PKAIItot  [uM]
+  double PKItot = 0.18;   // PKItot    [uM]
+  double Ka = 9.14;   // Ka        [uM]
+  double Kb = 1.64;   // Kb        [uM]
+  double Kd = 4.375;  // Kd        [uM]
+  double Ki_pki = 0.2e-3; // Ki_pki    [uM]
+  // PLB & PP1 module
+  double epsilon = 10;     // epsilon       [none]
+  double PLBtot = PLBtotBA; // PLBtot        [uM]
+  double PP1tot = PP1_PLBtot; // PP1tot    [uM]
+  double Inhib1tot = 0.3;    // Inhib1tot     [uM]
+  double k_pka_plb = 54;     // k_pka_plb     [1/sec]
+  double Km_pka_plb = 21;     // Km_pka_plb    [uM]
+  double k_pp1_plb = 8.5;    // k_pp1_plb     [1/sec]
+  double Km_pp1_plb = 7.0;    // Km_pp1_plb    [uM]
+  double k_pka_i1 = 60;     // k_pka_i1      [1/sec]
+  double Km_pka_i1 = 1.0;    // Km_pka_i1     [uM]
+  double Vmax_pp2a_i1 = 14.0;   // Vmax_pp2a_i1  [uM/sec]
+  double Km_pp2a_i1 = 1.0;    // Km_pp2a_i1    [uM]
+  double Ki_inhib1 = 1.0e-3; // Ki_inhib1     [uM]
+  // LCC module
+  double LCCtot = LCCtotBA; // LCCtot        [uM]
+  double PKAIIlcctot = 0.025;  // PKAIIlcctot   [uM]
+  double PP1lcctot = 0.025;  // PP1lcctot     [uM]
+  double PP2Alcctot = 0.025;  // PP2Alcctot    [uM]
+  double k_pka_lcc = 54;     // k_pka_lcc     [1/sec]
+  double Km_pka_lcc = 21;     // Km_pka_lcc    [uM]
+  double k_pp1_lcc = 8.52;   // k_pp1_lcc     [1/sec]
+  double Km_pp1_lcc = 3;      // Km_pp1_lcc    [uM]
+  double k_pp2a_lcc = 10.1;   // k_pp2a_lcc    [1/sec]
+  double Km_pp2a_lcc = 3;      // Km_pp2a_lcc   [uM]
+  // RyR module
+  double RyRtot = RyRtotBA; // RyRtot        [uM]
+  double PKAIIryrtot = 0.034;  // PKAIIryrtot   [uM]
+  double PP1ryr = 0.034;  // PP1ryr        [uM]
+  double PP2Aryr = 0.034;  // PP2Aryr       [uM]
+  double kcat_pka_ryr = 54;     // kcat_pka_ryr  [1/sec]
+  double Km_pka_ryr = 21;     // Km_pka_ryr    [uM]
+  double kcat_pp1_ryr = 8.52;   // kcat_pp1_ryr  [1/sec]
+  double Km_pp1_ryr = 7;      // Km_pp1_ryr    [uM]
+  double kcat_pp2a_ryr = 10.1;   // kcat_pp2a_ryr [1/sec]
+  double Km_pp2a_ryr = 4.1;    // Km_pp2a_ryr   [uM]
+  // TnI module
+  double TnItot = TnItotBA; // TnItot        [uM]
+  double PP2Atni = 0.67;   // PP2Atni       [uM]
+  double kcat_pka_tni = 54;     // kcat_pka_tni  [1/sec]
+  double Km_pka_tni = 21;     // Km_pka_tni    [uM]
+  double kcat_pp2a_tni = 10.1;   // kcat_pp2a_tni [1/sec]
+  double Km_pp2a_tni = 4.1;    // Km_pp2a_tni   [uM]
+  // Iks module
+  double Iks_tot = IKstotBA; // Iks_tot       [uM]
+  double Yotiao_tot = 0.025;  // Yotiao_tot    [uM]
+  double K_yotiao = 0.1e-3; // K_yotiao      [uM] ** apply G589D mutation here **
+  double PKAII_ikstot = 0.025;  // PKAII_ikstot  [uM]
+  double PP1_ikstot = 0.025;  // PP1_ikstot    [uM]
+  double k_pka_iks = 1.87;//54; // k_pka_iks   [1/sec] // adjusted as in Xie et al 2013
+  double Km_pka_iks = 21;     // Km_pka_iks    [uM]
+  double k_pp1_iks   = 0.19;//8.52; // k_pp1_iks [1/sec] // adjusted as in Xie et al 2013
+  double Km_pp1_iks = 7;      // Km_pp1_iks    [uM]
+  // Icftr Module - Added 04/30/10 by Anthony Soltis
+  double CFTR_tot = ICFTRtotBA; // CFTR_tot    [uM]
+  double PKAII_CFTRtot = 0.025;  // PKAII_CFTRtot [uM]
+  double PP1_CFTRtot = 0.025;  // PP1_CFTRtot   [uM]
+  double k_pka_CFTR = 54;     // k_pka_CFTR    [1/sec]
+  double Km_pka_CFTR = 8.5;    // Km_pka_CFTR   [uM]
+  double k_pp1_CFTR = 8.52;   // k_pp1_CFTR    [1/sec]
+  double Km_pp1_CFTR = 7;      // Km_pp1_CFTR   [uM]
+  // PLM module (from PLB)
+  double PLMtot = PLMtotBA; // PLM tot       [uM]
+  double kcat_pka_plm = 54;     // kcat_pka_plm  [1/sec]
+  double Km_pka_plm = 21;     // Km_pka_plm    [uM]
+  double kcat_pp2a_plm = 8.5;    // kcat_pp2a_plm [1/sec]
+  double Km_pp2a_plm = 7.0;    // Km_pp2a_plm   [uM]
+  // Myofilament module (from TnI)
+  double Myo_tot = MyototBA; // Myo tot      [uM]
+  double PP2Amyo = 0.67;  // PP2Amyo       [uM]
+  double kcat_pka_myo = 54;    // kcat_pka_myo  [1/sec]
+  double Km_pka_myo = 21;    // Km_pka_myo    [uM]
+  double kcat_pp2a_myo = 10.1;  // kcat_pp2a_myo [1/sec]
+  double Km_pp2a_myo = 4.1;   // Km_pp2a_myo   [uM]
+  // Ikr module (from Iks)
+  double Ikr_tot = IKrtotBA; // Iks_tot       [uM]
+  // double Yotiao_tot = 0.025;  // Yotiao_tot    [uM]
+  // double K_yotiao = 0.1e-3; // K_yotiao      [uM] ** apply G589D mutation here **
+  double PKAII_ikrtot = 0.025;  // PKAII_ikstot  [uM]
+  double PP1_ikrtot = 0.025;  // PP1_ikstot    [uM]
+  double k_pka_ikr = 1.87;//54; // k_pka_iks   [1/sec] // adjusted as in Xie et al 2013
+  double Km_pka_ikr = 21;     // Km_pka_iks    [uM]
+  double k_pp1_ikr = 0.19;//8.52; // k_pp1_iks [1/sec] // adjusted as in Xie et al 2013
+  double Km_pp1_ikr = 7;      // Km_pp1_iks    [uM]
+  // Iclca module (from Icftr)
+  double Iclca_tot = IClCatotBA; // Iclca_tot   [uM]
+  double PKAII_ClCatot = 0.025;  // PKAII_ClCatot [uM]
+  double PP1_ClCatot = 0.025;  // PP1_ClCatot   [uM]
+  double k_pka_ClCa = 54;     // k_pka_ClCa    [1/sec]
+  double Km_pka_ClCa = 8.5;    // Km_pka_ClCa   [uM]
+  double k_pp1_ClCa = 8.52;   // k_pp1_ClCa    [1/sec]
+  double Km_pp1_ClCa = 7;      // Km_pp1_ClCa   [uM]
+  //// -------- SIGNALING MODEL -----------
+
+  //// b-AR module
+  double LR = L[id]*B1AR[id]/Kl;
+  double LRG = LR*Gs[id]/Kr;
+  double RG = B1AR[id]*Gs[id]/Kc;
+  double BARKDESENS = k_barkp*(LR+LRG);
+  double BARKRESENS = k_barkm*B1AR_S464[id];
+  double PKADESENS = k_pkap*PKAC_I[id]*B1AR_ACT[id];  
+  double PKARESENS = k_pkam*B1AR_S301[id];
+  double GACT = k_gact*(RG+LRG);
+  double HYD = k_hyd*GsaGTPtot[id];
+  double REASSOC = k_reassoc*GsaGDP[id]*GsBy[id];
+  double dL = Ltotmax-LR-LRG-L[id];
+  double dB1AR = B1AR_ACT[id]-LR-LRG-RG-B1AR[id];
+  double dGs = Gstot-LRG-RG-Gs[id];
+  double dB1AR_ACT = (BARKRESENS-BARKDESENS)+(PKARESENS-PKADESENS);
+  double dB1AR_S464 = BARKDESENS-BARKRESENS;
+  double dB1AR_S301 = PKADESENS-PKARESENS;
+  double dGsaGTPtot = GACT-HYD;
+  double dGsaGDP = HYD-REASSOC;
+  double dGsBy = GACT-REASSOC;
+  // end b-AR module
+
+  //// cAMP module
+  double Gsa_gtp_AC = GsaGTP[id]*AC[id]/Kgsa;
+  double Fsk_AC = Fsk[id]*AC[id]/Kfsk;
+  double AC_ACT_BASAL = k_ac_basal*AC[id]*ATP/(Km_basal+ATP);     
+  double AC_ACT_GSA = k_ac_gsa*Gsa_gtp_AC*ATP/(Km_gsa+ATP); 
+  double AC_ACT_FSK = k_ac_fsk*Fsk_AC*ATP/(Km_fsk+ATP);    
+  // PDE3_ACT = k_pde3*PDE[id]*cAMP[id]/(Km_pde3+cAMP[id]); 
+  // PDE4_ACT = k_pde4*PDE[id]*cAMP[id]/(Km_pde4+cAMP[id]); 
+  double PDE3_ACT = k_pde3*PDE3tot*cAMP[id]/(Km_pde3*(1+IBMXtot/Ki_ibmx)+cAMP[id]); // new PDE3 term w IBMX
+  double PDE4_ACT = k_pde4*PDE4tot*cAMP[id]/(Km_pde4*(1+IBMXtot/Ki_ibmx)+cAMP[id]); // new PDE4 term w IBMX
+  double PDE_IBMX = PDE[id]*IBMX[id]/Ki_ibmx;
+  double dGsaGTP = GsaGTPtot[id]-Gsa_gtp_AC-GsaGTP[id];
+  double dFsk = Fsktot-Fsk_AC-Fsk[id];
+  double dAC = AC_tot-Gsa_gtp_AC-AC[id];  // note: assumes Fsk = 0.  Change Gsa_gtp_AC to Fsk_AC for Forskolin.
+  // dPDE = PDE4tot-PDE_IBMX-PDE[id];
+  // dIBMX = IBMXtot-PDE_IBMX-IBMX[id];
+  double dPDE = 0;
+  double dIBMX = 0;
+  double dcAMPtot = AC_ACT_BASAL+AC_ACT_GSA+AC_ACT_FSK-PDE3_ACT-PDE4_ACT;
+  // end cAMP module
+
+  //// PKA module
+  double PKI = PKItot*Ki_pki/(Ki_pki+PKAC_I[id]+PKAC_II[id]);
+  double A2RC_I = (PKAC_I[id]/Kd)*PKAC_I[id]*(1+PKI/Ki_pki);
+  double A2R_I = PKAC_I[id]*(1+PKI/Ki_pki);
+  double A2RC_II = (PKAC_II[id]/Kd)*PKAC_II[id]*(1+PKI/Ki_pki);
+  double A2R_II = PKAC_II[id]*(1+PKI/Ki_pki);
+  double ARC_I = (Ka/cAMP[id])*A2RC_I;
+  double ARC_II = (Ka/cAMP[id])*A2RC_II;
+  double dcAMP = cAMPtot[id]-(ARC_I+2*A2RC_I+2*A2R_I)-(ARC_II+2*A2RC_II+2*A2R_II)-cAMP[id];
+  double PKAtemp = Ka*Kb/Kd+Ka*cAMP[id]/Kd+(cAMP[id]*cAMP[id])/Kd;
+  double dPKAC_I = 2*PKAItot*(cAMP[id]*cAMP[id])-PKAC_I[id]*(1+PKI/Ki_pki)*(PKAtemp*PKAC_I[id]+(cAMP[id]*cAMP[id]));
+  double dPKAC_II = 2*PKAIItot*(cAMP[id]*cAMP[id])-PKAC_II[id]*(1+PKI/Ki_pki)*(PKAtemp*PKAC_II[id]+(cAMP[id]*cAMP[id]));
+  // end PKA module
+
+  //// PLB & PP1 module
+  double PLB = PLBtot-PLBp[id];
+  double PLB_PHOSPH = k_pka_plb*PKAC_I[id]*PLB/(Km_pka_plb+PLB);
+  double PLB_DEPHOSPH = k_pp1_plb*PP1[id]*PLBp[id]/(Km_pp1_plb+PLBp[id]);
+  double dPLBp = PLB_PHOSPH-PLB_DEPHOSPH;
+   
+  double Inhib1 = Inhib1tot-Inhib1ptot[id];
+  double Inhib1p_PP1 = Inhib1p[id]*PP1[id]/Ki_inhib1;
+  double Inhib1_PHOSPH = k_pka_i1*PKAC_I[id]*Inhib1/(Km_pka_i1+Inhib1); 
+  double Inhib1_DEPHOSPH = Vmax_pp2a_i1*Inhib1ptot[id]/(Km_pp2a_i1+Inhib1ptot[id]);
+  double dInhib1ptot = Inhib1_PHOSPH-Inhib1_DEPHOSPH;
+  double dInhib1p = Inhib1ptot[id]-Inhib1p_PP1-Inhib1p[id];
+  double dPP1 = PP1tot-Inhib1p_PP1-PP1[id];
+  // end PLB & PP1 module
+
+  //// LCC module
+  double PKAClcc = (PKAIIlcctot/PKAIItot)*PKAC_II[id];
+  double LCCa = LCCtot-LCCa_PKAp_whole[id];
+  double LCCa_PHOSPH = epsilon*k_pka_lcc*PKAClcc*LCCa/(Km_pka_lcc + epsilon*LCCa);
+  double LCCa_DEPHOSPH = epsilon*k_pp2a_lcc*PP2Alcctot*LCCa_PKAp_whole[id]/(Km_pp2a_lcc+epsilon*LCCa_PKAp_whole[id]);
+  double dLCCa_PKAp_whole = LCCa_PHOSPH - LCCa_DEPHOSPH;
+   
+  double LCCb = LCCtot-LCCb_PKAp_whole[id];
+  double LCCb_PHOSPH = epsilon*k_pka_lcc*PKAClcc*LCCb/(Km_pka_lcc+epsilon*LCCb);   
+  double LCCb_DEPHOSPH = epsilon*k_pp1_lcc*PP1lcctot*LCCb_PKAp_whole[id]/(Km_pp1_lcc+epsilon*LCCb_PKAp_whole[id]);
+  double dLCCb_PKAp_whole = LCCb_PHOSPH-LCCb_DEPHOSPH;
+  // end LCC module
+
+  //// RyR module
+  double PKACryr = (PKAIIryrtot/PKAIItot)*PKAC_II[id];
+  double RyR = RyRtot-RyR_PKAp_whole[id];
+  double RyRPHOSPH = epsilon*kcat_pka_ryr*PKACryr*RyR/(Km_pka_ryr+epsilon*RyR);
+  double RyRDEPHOSPH1 = epsilon*kcat_pp1_ryr*PP1ryr*RyR_PKAp_whole[id]/(Km_pp1_ryr+epsilon*RyR_PKAp_whole[id]);
+  double RyRDEPHOSPH2A = epsilon*kcat_pp2a_ryr*PP2Aryr*RyR_PKAp_whole[id]/(Km_pp2a_ryr+epsilon*RyR_PKAp_whole[id]);
+  double dRyR_PKAp_whole = RyRPHOSPH-RyRDEPHOSPH1-RyRDEPHOSPH2A;
+  // end RyR module
+
+  //// TnI module
+  double TnI = TnItot-TnI_PKAp_whole[id];
+  double TnIPHOSPH = kcat_pka_tni*PKAC_I[id]*TnI/(Km_pka_tni+TnI);
+  double TnIDEPHOSPH = kcat_pp2a_tni*PP2Atni*TnI_PKAp_whole[id]/(Km_pp2a_tni+TnI_PKAp_whole[id]);
+  double dTnI_PKAp_whole = TnIPHOSPH-TnIDEPHOSPH;
+  // end TnI module
+
+  //// Iks module
+  double IksYot = IKs_PKAn[id]*Yotiao_KCQN1[id]/K_yotiao;           // [uM]
+  double dIKs_PKAn = Iks_tot - IksYot - IKs_PKAn[id];    // [uM]
+  double dYotiao_KCQN1 = Yotiao_tot - IksYot - Yotiao_KCQN1[id];    // [uM]
+  double PKACiks = (IksYot/Iks_tot)*(PKAII_ikstot/PKAIItot)*PKAC_II[id];
+  double PP1iks = (IksYot/Iks_tot)*PP1_ikstot;
+  double Iks = Iks_tot-IKs_PKAp_whole[id];
+  double IKS_PHOSPH = epsilon*k_pka_iks*PKACiks*Iks/(Km_pka_iks+epsilon*Iks);
+  double IKS_DEPHOSPH = epsilon*k_pp1_iks *PP1iks*IKs_PKAp_whole[id]/(Km_pp1_iks+epsilon*IKs_PKAp_whole[id]);
+  double dIKs_PKAp_whole = IKS_PHOSPH-IKS_DEPHOSPH;
+  // end Iks module
+
+  //// CFTR module (included 04/30/10)
+  double CFTRn = CFTR_tot - ICFTR_PKAp_whole[id];  // Non-phos = tot - phos
+  double PKAC_CFTR = (PKAII_CFTRtot/PKAIItot)*PKAC_II[id];    // (PKACFTRtot/PKAIItot)*PKAIIact
+  double CFTRphos = epsilon*CFTRn*PKAC_CFTR*k_pka_CFTR/(Km_pka_CFTR+epsilon*CFTRn);
+  double CFTRdephos = PP1_CFTRtot*k_pp1_CFTR*epsilon*ICFTR_PKAp_whole[id]/(Km_pp1_CFTR+epsilon*ICFTR_PKAp_whole[id]);
+  double dICFTR_PKAp_whole = CFTRphos - CFTRdephos;
+  // end CFTR module
+
+  //// PLM module (from PLB)
+  double PLM = PLMtot-PLM_PKAp_whole[id];
+  double PLM_PHOSPH = kcat_pka_plm*PKAC_I[id]*PLM/(Km_pka_plm+PLM);
+  double PLM_DEPHOSPH = kcat_pp2a_plm*PP1[id]*PLM_PKAp_whole[id]/(Km_pp2a_plm+PLM_PKAp_whole[id]);
+  double dPLM_PKAp_whole = PLM_PHOSPH-PLM_DEPHOSPH;
+  // end PLM module
+
+  //// Myofilament module (from TnI)
+  double Myo = Myo_tot-Myo_PKAp_whole[id];
+  double MyoPHOSPH = kcat_pka_myo*PKAC_I[id]*Myo/(Km_pka_myo+Myo);
+  double MyoDEPHOSPH = kcat_pp2a_myo*PP2Amyo*Myo_PKAp_whole[id]/(Km_pp2a_myo+Myo_PKAp_whole[id]);
+  double dMyo_PKAp_whole = MyoPHOSPH-MyoDEPHOSPH;
+  // end myofilament module
+
+  //// Ikr module (from Iks)
+  double IkrYot = IKr_PKAn[id]*Yotiao_hERG[id]/K_yotiao;           // [uM]
+  double dIKr_PKAn = Ikr_tot - IkrYot - IKr_PKAn[id];    // [uM]
+  double dYotiao_hERG = Yotiao_tot - IkrYot - Yotiao_hERG[id];    // [uM]
+  double PKACikr = (IkrYot/Ikr_tot)*(PKAII_ikrtot/PKAIItot)*PKAC_II[id];
+  double PP1ikr = (IkrYot/Ikr_tot)*PP1_ikrtot;
+  double Ikr = Ikr_tot-IKr_PKAp_whole[id];
+  double IKR_PHOSPH = epsilon*k_pka_ikr*PKACikr*Ikr/(Km_pka_ikr+epsilon*Ikr);
+  double IKR_DEPHOSPH = epsilon*k_pp1_ikr*PP1ikr*IKr_PKAp_whole[id]/(Km_pp1_ikr+epsilon*IKr_PKAp_whole[id]);
+  double dIKr_PKAp_whole = IKR_PHOSPH-IKR_DEPHOSPH;
+  // end Ikr module
+
+  //// ICl(Ca) module
+  // 88->115 89->116 90-117 91-118 92-119 93-12o 94-121
+  double ClCan = CFTR_tot - IClCa_PKAp_whole[id];  // Non-phos = tot - phos
+  double PKAC_ClCa = (PKAII_ClCatot/PKAIItot)*PKAC_II[id];    // (PKACFTRtot/PKAIItot)*PKAIIact
+  double ClCaphos = epsilon*ClCan*PKAC_ClCa*k_pka_ClCa/(Km_pka_ClCa+epsilon*ClCan);
+  double ClCadephos = PP1_ClCatot*k_pp1_ClCa*epsilon*IClCa_PKAp_whole[id]/(Km_pp1_ClCa+epsilon*IClCa_PKAp_whole[id]);
+  double dIClCa_PKAp_whole = ClCaphos - ClCadephos;
+  // end ICl(Ca) module
+
+  //// ISO-target (set ydot(x) = 0 to prevent ISO effect on a specific target)
+  //dPLBp = 0; // PLB
+  //dLCCa_PKAp_whole = 0; dLCCb_PKAp_whole = 0; // LCCa and LCCb
+  //dRyR_PKAp_whole = 0; // RyR
+  // //dTnI_PKAp_whole = 0; // TnI // not used
+  //dIKs_PKAp_whole = 0; // IKs
+  //dICFTR_PKAp_whole = 0; // ICFTR
+  //dPLM_PKAp_whole = 0; // PLM
+  //dIKr_PKAp_whole = 0; // IKr
+  //dIClCa_PKAp_whole = 0; // IClCa
+
+  //dMyo_PKAp_whole = 0; // Myofilament
+
+  //// Gather odes
+  // Need to convert all ydot terms that are ODEs (not DAEs) to miliseconds
+  // odes = [4,5,6,7,8,9,13,14,15,19,20,23,24,25,26,29,30,31,32,35,36];
+  // ydot(odes) = ydot(odes).*1e-3;
+  dB1AR_ACT         *= 1e-3;
+  dB1AR_S464        *= 1e-3;
+  dB1AR_S301        *= 1e-3;
+  dGsaGTPtot        *= 1e-3;
+  dGsaGDP           *= 1e-3;
+  dGsBy             *= 1e-3;
+  dPDE              *= 1e-3;
+  dIBMX             *= 1e-3;
+  dcAMPtot          *= 1e-3;
+  dPLBp             *= 1e-3;
+  dInhib1ptot       *= 1e-3;
+  dLCCa_PKAp_whole  *= 1e-3;
+  dLCCb_PKAp_whole  *= 1e-3;
+  dRyR_PKAp_whole   *= 1e-3;
+  dTnI_PKAp_whole   *= 1e-3;
+  dIKs_PKAp_whole   *= 1e-3;
+  dICFTR_PKAp_whole *= 1e-3;
+  dPLM_PKAp_whole   *= 1e-3;
+  dMyo_PKAp_whole   *= 1e-3;
+  dIKr_PKAp_whole   *= 1e-3;
+  dIClCa_PKAp_whole *= 1e-3;
+
+  // double dydt[36] = {dL,dB1AR,dGs,dB1AR_ACT,dB1AR_S464,dB1AR_S301,dGsaGTPtot,dGsaGDP,dGsBy,dGsaGTP,dFsk,dAC,dPDE,dIBMX,dcAMPtot,dcAMP,dPKAC_I,dPKAC_II,dPLBp,dInhib1ptot,dInhib1p,dPP1,dLCCa_PKAp_whole,dLCCb_PKAp_whole,dRyR_PKAp_whole,dTnI_PKAp_whole,dIKs_PKAn,dYotiao_KCQN1,dIKs_PKAp_whole,dICFTR_PKAp_whole,dPLM_PKAp_whole,dMyo_PKAp_whole,dIKr_PKAn,dYotiao_hERG,dIKr_PKAp_whole,dIClCa_PKAp_whole};
+
+  // for(int i=0;i<36;i++){
+  //   dydt_BAR[(id*36)+i] = dydt[i];
+  // }
+  dydt_BAR[(id*36)+  0] = dL;
+  dydt_BAR[(id*36)+  1] = dB1AR;
+  dydt_BAR[(id*36)+  2] = dGs;
+  dydt_BAR[(id*36)+  3] = dB1AR_ACT;
+  dydt_BAR[(id*36)+  4] = dB1AR_S464;
+  dydt_BAR[(id*36)+  5] = dB1AR_S301;
+  dydt_BAR[(id*36)+  6] = dGsaGTPtot;
+  dydt_BAR[(id*36)+  7] = dGsaGDP;
+  dydt_BAR[(id*36)+  8] = dGsBy;
+  dydt_BAR[(id*36)+  9] = dGsaGTP;
+  dydt_BAR[(id*36)+ 10] = dFsk;
+  dydt_BAR[(id*36)+ 11] = dAC;
+  dydt_BAR[(id*36)+ 12] = dPDE;
+  dydt_BAR[(id*36)+ 13] = dIBMX;
+  dydt_BAR[(id*36)+ 14] = dcAMPtot;
+  dydt_BAR[(id*36)+ 15] = dcAMP;
+  dydt_BAR[(id*36)+ 16] = dPKAC_I;
+  dydt_BAR[(id*36)+ 17] = dPKAC_II;
+  dydt_BAR[(id*36)+ 18] = dPLBp;
+  dydt_BAR[(id*36)+ 19] = dInhib1ptot;
+  dydt_BAR[(id*36)+ 20] = dInhib1p;
+  dydt_BAR[(id*36)+ 21] = dPP1;
+  dydt_BAR[(id*36)+ 22] = dLCCa_PKAp_whole;
+  dydt_BAR[(id*36)+ 23] = dLCCb_PKAp_whole;
+  dydt_BAR[(id*36)+ 24] = dRyR_PKAp_whole;
+  dydt_BAR[(id*36)+ 25] = dTnI_PKAp_whole;
+  dydt_BAR[(id*36)+ 26] = dIKs_PKAn;
+  dydt_BAR[(id*36)+ 27] = dYotiao_KCQN1;
+  dydt_BAR[(id*36)+ 28] = dIKs_PKAp_whole;
+  dydt_BAR[(id*36)+ 29] = dICFTR_PKAp_whole;
+  dydt_BAR[(id*36)+ 30] = dPLM_PKAp_whole;
+  dydt_BAR[(id*36)+ 31] = dMyo_PKAp_whole;
+  dydt_BAR[(id*36)+ 32] = dIKr_PKAn;
+  dydt_BAR[(id*36)+ 33] = dYotiao_hERG;
+  dydt_BAR[(id*36)+ 34] = dIKr_PKAp_whole;
+  dydt_BAR[(id*36)+ 35] = dIClCa_PKAp_whole;
+
+
+}
+
+void CSubcell::solve_ODE_BAR(int id){
+  L[id]                   += dydt_BAR[ (id*36) +  0]*dt;
+  B1AR[id]                += dydt_BAR[ (id*36) +  1]*dt;   
+  Gs[id]                  += dydt_BAR[ (id*36) +  2]*dt; 
+  B1AR_ACT[id]            += dydt_BAR[ (id*36) +  3]*dt;       
+  B1AR_S464[id]           += dydt_BAR[ (id*36) +  4]*dt;        
+  B1AR_S301[id]           += dydt_BAR[ (id*36) +  5]*dt;        
+  GsaGTPtot[id]           += dydt_BAR[ (id*36) +  6]*dt;        
+  GsaGDP[id]              += dydt_BAR[ (id*36) +  7]*dt;     
+  GsBy[id]                += dydt_BAR[ (id*36) +  8]*dt;   
+  GsaGTP[id]              += dydt_BAR[ (id*36) +  9]*dt;     
+  Fsk[id]                 += dydt_BAR[ (id*36) + 10]*dt; 
+  AC[id]                  += dydt_BAR[ (id*36) + 11]*dt;
+  PDE[id]                 += dydt_BAR[ (id*36) + 12]*dt; 
+  IBMX[id]                += dydt_BAR[ (id*36) + 13]*dt;  
+  cAMPtot[id]             += dydt_BAR[ (id*36) + 14]*dt;     
+  cAMP[id]                += dydt_BAR[ (id*36) + 15]*dt;  
+  PKAC_I[id]              += dydt_BAR[ (id*36) + 16]*dt;    
+  PKAC_II[id]             += dydt_BAR[ (id*36) + 17]*dt;     
+  PLBp[id]                += dydt_BAR[ (id*36) + 18]*dt;  
+  Inhib1ptot[id]          += dydt_BAR[ (id*36) + 19]*dt;        
+  Inhib1p[id]             += dydt_BAR[ (id*36) + 20]*dt;     
+  PP1[id]                 += dydt_BAR[ (id*36) + 21]*dt; 
+  LCCa_PKAp_whole[id]     += dydt_BAR[ (id*36) + 22]*dt;             
+  LCCb_PKAp_whole[id]     += dydt_BAR[ (id*36) + 23]*dt;             
+  RyR_PKAp_whole[id]      += dydt_BAR[ (id*36) + 24]*dt;            
+  TnI_PKAp_whole[id]      += dydt_BAR[ (id*36) + 25]*dt;            
+  IKs_PKAn[id]            += dydt_BAR[ (id*36) + 26]*dt;      
+  Yotiao_KCQN1[id]        += dydt_BAR[ (id*36) + 27]*dt;          
+  IKs_PKAp_whole[id]      += dydt_BAR[ (id*36) + 28]*dt;            
+  ICFTR_PKAp_whole[id]    += dydt_BAR[ (id*36) + 29]*dt;              
+  PLM_PKAp_whole[id]      += dydt_BAR[ (id*36) + 30]*dt;            
+  Myo_PKAp_whole[id]      += dydt_BAR[ (id*36) + 31]*dt;            
+  IKr_PKAn[id]            += dydt_BAR[ (id*36) + 32]*dt;      
+  Yotiao_hERG[id]         += dydt_BAR[ (id*36) + 33]*dt;         
+  IKr_PKAp_whole[id]      += dydt_BAR[ (id*36) + 34]*dt;            
+  IClCa_PKAp_whole[id]    += dydt_BAR[ (id*36) + 35]*dt;              
+
+}
+
+double CSubcell::computeave_RyRp_Multiplier(void)
+{
+
+  double sum=0;
+
+  for (int id=0;id<n;id++){
+    double fCKII_RyR = (20 * RyR_CKp[id] / 3.0 - 1 / 3.0); //
+    double fPKA_RyR = (RyR_PKAp[id] * 1.025) + 0.9750; //
+  
+    sum+=(fCKII_RyR + fPKA_RyR - 1);
+  }
+  return (sum/nn);
 }
 
 #endif

@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
   Logging llog;
 
   //cell size
-//    const int nx=65;    const int ny=27;    const int nz=11;
+   // const int nx=65;    const int ny=27;    const int nz=11;
   const int nx = 10;    const int ny = 10;    const int nz = 10;
   const int nn = nx * ny * nz;
 
@@ -125,24 +125,50 @@ int main(int argc, char* argv[]) {
   double prevaveci[nn];
   double prevavecs[nn];
   double prevavecp[nn];
+
+  double prevavecjsr[nn];
   for (int i = 0; i < nn; i++) {
     prevaveci[i] = 0;
     prevavecs[i] = 0;
     prevavecp[i] = 0;
+
+    prevavecjsr[i] = 0;
   }
 
-  int num_sims = 30;
+
+  #ifdef ___PTM
+    double prevave_RYR_multiplier[nn];
+    for (int i = 0; i < nn; i++){
+      prevave_RYR_multiplier[i] = 0;
+    }
+  #endif 
+
+  int num_sims = 30; //
   for (int itr = 0; itr < num_sims; itr++) {
     cout << itr << endl;
 
     double aveci[nn];
     double avecs[nn];
     double avecp[nn];
+
+    double avecjsr[nn];
+
+
     for (int i = 0; i < nn; i++) {
       aveci[i] = 0;
       avecs[i] = 0;
       avecp[i] = 0;
+
+      avecjsr[i] = 0;      
     }
+
+    #ifdef ___PTM //Sanity check 
+      double ave_RYR_multiplier[nn]; 
+
+      for (int i = 0; i < nn; i++){
+        ave_RYR_multiplier[i] =0;
+      }
+    #endif 
 
     //main loop
 
@@ -171,7 +197,16 @@ int main(int argc, char* argv[]) {
         aveci[i] += sc.ci[i];
         avecs[i] += sc.cs[i];
         avecp[i] += sc.cp[i];
+
+        avecjsr[i] += sc.cjsr[i];
       }
+
+      #ifdef ___PTM
+        for (int i = 0; i < nn; i++){
+          ave_RYR_multiplier[i] += sc.RYR_multiplier[i];
+        }
+      #endif 
+
     }
     //end main loop
 
@@ -181,7 +216,33 @@ int main(int argc, char* argv[]) {
     }
 
     //record average values
-    ofstream osave("results/ave.txt");
+    
+    std::string results_folder = "results/";
+    #if defined(___PTM)
+      std::string file_prefix = "ave_ptm";
+      std::string file_name = results_folder + file_prefix + "_" + std::to_string(nn);
+      file_name += ".txt";
+
+      std::ofstream osave(file_name);
+      cout << "___PTM Defined. Created " << file_name << endl;
+    #elif defined(___SPTM)
+      std::string file_prefix = "ave_sptm";
+      std::string file_name = results_folder + file_prefix + "_" + std::to_string(nn) + "_" + std::to_string(10);
+      file_name += ".txt";
+
+      std::ofstream osave(file_name);
+      cout << "___SPTM Defined. Created " << file_name << endl;
+
+    #else 
+      std::string file_prefix = "ave";
+      std::string file_name = results_folder + file_prefix + "_" + std::to_string(nn);
+      file_name += ".txt";
+
+      ofstream osave(file_name);
+      cout << "No PTM Macro Defined. Created " << file_name << endl;
+    #endif 
+
+      // Tn = nbeats * pcl / dt;
     for (int i = 0; i < nn; i++) {
       prevaveci[i] = prevaveci[i] * itr + aveci[i] / Tn;
       prevaveci[i] /= (itr + 1);
@@ -189,8 +250,61 @@ int main(int argc, char* argv[]) {
       prevavecs[i] /= (itr + 1);
       prevavecp[i] = prevavecp[i] * itr + avecp[i] / Tn;
       prevavecp[i] /= (itr + 1);
-      cout << sc.nryr[i] << "\t" << sc.vp[i] << "\t" << sc.Jmaxx[i] << "\t" << prevaveci[i] << "\t" << prevavecs[i] << "\t" << prevavecp[i] << endl;
-      osave << sc.nryr[i] << "\t" << sc.vp[i] << "\t" << sc.Jmaxx[i] << "\t" << prevaveci[i] << "\t" << prevavecs[i] << "\t" << prevavecp[i] << endl;
+
+      prevavecjsr[i] = prevavecjsr[i] * itr + avecjsr[i] / Tn;
+      prevavecjsr[i] /= (itr +1);
+
+
+
+      #ifdef ___PTM
+        prevave_RYR_multiplier[i] = prevave_RYR_multiplier[i] * itr + ave_RYR_multiplier[i] / Tn;
+        prevave_RYR_multiplier[i] /= (itr + 1);
+
+        cout << 
+          i                         << "\t" << 
+          sc.nryr[i]                << "\t" << 
+          sc.vp[i]                  << "\t" << 
+          sc.Jmaxx[i]               << "\t" << 
+          prevaveci[i]              << "\t" << 
+          prevavecs[i]              << "\t" << 
+          prevavecp[i]              << "\t" << 
+          prevavecjsr[i]            << "\t" << 
+          prevave_RYR_multiplier[i] << "\t" <<
+          sc.RYR_multiplier[i]      << "\t" << 
+        endl;
+
+        osave << 
+          sc.nryr[i]                << "\t" << //1
+          sc.vp[i]                  << "\t" << //2
+          sc.Jmaxx[i]               << "\t" << //3
+          prevaveci[i]              << "\t" << //4
+          prevavecs[i]              << "\t" << //5
+          prevavecp[i]              << "\t" << //6
+          prevavecjsr[i]            << "\t" << //7
+          prevave_RYR_multiplier[i] << "\t" << //8
+          sc.RYR_multiplier[i]      << "\t" << //9
+        endl;
+      #else
+        cout << 
+          sc.nryr[i]                << "\t" <<
+          sc.vp[i]                  << "\t" <<
+          sc.Jmaxx[i]               << "\t" <<
+          prevaveci[i]              << "\t" <<
+          prevavecs[i]              << "\t" <<
+          prevavecp[i]              << "\t" <<
+          prevavecjsr[i]            << "\t" <<
+        endl;
+
+        osave <<
+          sc.nryr[i]                << "\t" << //1
+          sc.vp[i]                  << "\t" << //2 
+          sc.Jmaxx[i]               << "\t" << //3
+          prevaveci[i]              << "\t" << //4
+          prevavecs[i]              << "\t" << //5
+          prevavecp[i]              << "\t" << //6 
+          prevavecjsr[i]            << "\t" << //7
+        endl;
+      #endif 
     }
   }
 

@@ -298,15 +298,22 @@ public:
 
 #ifdef ___PTM
 
+  int expression; //Wildtype (WT), CaMKII overexpression (OE), CaMKII knockout (KO)
 
-  //All Parameters
-  int expression;
+  //CaM Parameters
   double CaMtotDyad,BtotDyad,CaMKIItotDyad,CaNtotDyad,PP1totDyad;
   double CaMtotSL,BtotSL,CaMKIItotSL,CaNtotSL,PP1totSL;
   double CaMtotCyt,BtotCyt,CaMKIItotCyt,CaNtotCyt,PP1totCyt;
+  
+  //CaMKII Parameters
   double LCCtotDyad,RyRtot,PP1_dyad, PP2A_dyad,OA,LCCtotSL,PP1_SL;
+  double CKIIOE,recoveryTime;
+
+  //B-AR parameters
   double PLBtot,Ligtot,LCCtotBA,RyRtotBA,PLBtotBA,TnItotBA,IKstotBA,ICFTRtotBA,PP1_PLBtot;
-  double PLMtotBA,MyototBA,IKrtotBA,IClCatotBA,CKIIOE,recoveryTime;
+  double PLMtotBA,MyototBA,IKrtotBA,IClCatotBA;
+
+
 
 
   void allocate_memory_all_PTM_vars(int n);
@@ -314,7 +321,7 @@ public:
   void init_state_variables_PTMs(int id);
 
   //* * * * * CaM State Variables * * * * * 
-    double *dydt_CaMDyad, *dydt_CaMSL, *dydt_CaMCyt;
+    double *dydt_CaMDyad, *dydt_CaMSL, *dydt_CaMCyt; //15 ODes each
     double *JCaCyt, *JCaSL, *JCaDyad;
 
     //CaM_Dyad
@@ -342,22 +349,45 @@ public:
   //* * * * * CaMKII Variables * * * * *  
 
     //CaMKII State Variables
-    double *dydt_CaMKII;
-    double *LCC_PKAp, *LCC_CKdyadp, *LCC_CKslp;
-    double *RyR2809p, *RyR2815p;
-    double *PLBT17p;
+    double *dydt_CaMKII; //6 ODEs
 
-    //CaMKII parameters
-    //Not yet defined
+    double *LCC_CKdyadp, *LCC_CKslp, *RyR2815p, *PLBT17p;
+    double *LCC_PKAp,*RyR2809p; //obsolete/unused (new PKA module takes care of it)
     double *CaMKIIactDyad, *CaMKIIactSL, *PP1_PLB_avail;
-
-    //CaMKII Parameters
-    // *LCC_CKdyadp, 
     double *RyR_CKp, *PLB_CKp;
 
     void calc_dydt_CaMKII_ODEs(int id);
     void solve_ODE_CaMKII(int id);
   //* * * * * CaMKII Variables * * * * * 
+
+  //* * * * * Beta-Adrenergic (B-AR) Variables * * * * *  
+    double *dydt_BAR; //36 ODEs
+
+    //B-AR State Variables
+    double *L, *B1AR, *Gs, *B1AR_ACT, *B1AR_S464, *B1AR_S301;
+    double *GsaGTPtot, *GsaGDP, *GsBy, *GsaGTP;
+    double *Fsk, *AC, *PDE, *IBMX, *cAMPtot, *cAMP;
+    double *PKAC_I, *PKAC_II, *PLBp, *Inhib1ptot, *Inhib1p, *PP1;
+    double *LCCa_PKAp_whole, *LCCb_PKAp_whole, *RyR_PKAp_whole;
+    double *TnI_PKAp_whole, *IKs_PKAn, *Yotiao_KCQN1;
+    double *IKs_PKAp_whole, *ICFTR_PKAp_whole, *PLM_PKAp_whole;
+    double *Myo_PKAp_whole, *IKr_PKAn, *Yotiao_hERG, *IKr_PKAp_whole;
+    double *IClCa_PKAp_whole;
+
+    //ECC State Variables from PKA
+    double *LCCa_PKAp, *LCCb_PKAp, *PLB_PKAn;
+    double *RyR_PKAp, *TnI_PKAp, *IKs_PKAp;
+    double *ICFTR_PKAp, *PLM_PKAp, *Myo_PKAp;
+    double *IKr_PKAp, *IClCa_PKAp;
+
+    void calc_dydt_BAR_ODEs(int id);
+    void solve_ODE_BAR(int id); 
+    //TODO all dydt arrays need to be 2 dimensional (dydt needs to be different for every ID)
+
+    //Recording Variables (Sanity Check)
+    double computeave_RyRp_Multiplier(void);
+    double *RYR_multiplier;
+  //* * * * * Beta-Adrenergic (B-AR) Variables * * * * *  
 
 #endif 
 
