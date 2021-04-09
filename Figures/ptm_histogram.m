@@ -1,9 +1,10 @@
 %% Histogram
-cd '/Users/satolab/Documents/Projects/CaMKII_Subcell/results'
+cd '/Users/satolab/Documents/Projects/CaMKII_Subcell/'
 
-orig_data = load('ave_1000.txt');
+orig_data = load('ave.txt');
 % ptm_actual_data = load('ave_sptm_1000.txt');
-ptm_data = load('ave_ptm_SATO.txt');
+% ptm_data = load('ave_ptm_SATO.txt');
+ptm_data = load('ave_ptm.txt');
 
 nryr = orig_data(:,1);
 vp = orig_data(:,2);

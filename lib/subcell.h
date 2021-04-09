@@ -5,7 +5,7 @@
 // Cs has buffer if you don't want, use ___NO_CS_BUFFER
 // fine mesh is optional// to use fmesh = 3 or 5 ; for 5 dt=0.005
 
-
+//Starting again
 //compile Options
 //___USE_ORG_PARAM
 //___NO_CS_BUFFER
@@ -151,7 +151,6 @@ public:
 #else
   int *y,*ryr1,*ryr2,*ryr3,*nryr;
 #endif
-
   double *vp;
   double *Jmaxx;
 
@@ -167,10 +166,10 @@ public:
   double computeavecnsr(void);
   CSubcell& operator=(const CSubcell& sc);
 
-  //Bardia 2020
-  void printsc0d(double t, double v,std::string filename);
-  // void voltage_clamp(double relative_t, double peak_v, bool output, double dt, double min_v, double APD, double pcl, double na_conc);
-  void voltage_clamp(double t, double peak_v, bool output, double dt=0.1, double min_v = -80.0, double APD = 250.0, double pcl=1000.0, double na_conc=12.0);
+
+
+
+
 
 
   void setdt(double newdt){dt=newdt;};

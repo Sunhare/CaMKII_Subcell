@@ -1,0 +1,12 @@
+Start Time : 2021/04/06 (Tue)  15:34:56 -0700 (PDT)
+Host name : Bardias-MacBook-Pro.local
+OS name and version : Darwin   20.2.0  Darwin Kernel Version 20.2.0: Wed Dec  2 20:39:59 PST 2020; root:xnu-7195.60.75~1/RELEASE_X86_64
+User : satolab (UID=501, GID=20, HOME=/Users/satolab)
+PID : 55146
+Execute Directory : /Users/satolab/Documents/Projects/CaMKII_Subcell
+GNU C/C++ 9.3.0
+OpenMP (201511) : Enabled (Max # of threads = 16)
+
+Note : 2021/04/06 (Tue)  15:34:56 -0700 (PDT)  [Physical time interval : 0.001593 sec]
+seed=100
+

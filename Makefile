@@ -1,4 +1,4 @@
-DEF= -DCPU -D___PERIODIC -D___SIGMOID -D___NCX -D___PTM
+DEF= -DCPU -D___PERIODIC -D___SIGMOID -D___NCX
 
 CXX=g++-9
 CXXFLAGS=-O3 -fopenmp -std=c++11
