@@ -993,7 +993,7 @@ void CSubcell::pace(double v, double nai)
     double k23=MM/taub*BCSQN/BCSQN0;
     double k41=1/tauu;
     double k34=1/tauc2;
-    double k32=k41*k12/k43;
+    double k32=k41*k12*k23*k34/(k43*k21*k14);
 
 #ifdef ___DETERMINISTIC
 

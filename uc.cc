@@ -25,7 +25,7 @@ inline unsigned int xorshift2(unsigned int *xx, unsigned int *yy, unsigned int *
 
 
 int main(int argc, char* argv[]) {
-  // Logging llog;
+  Logging llog;
 
   //Sanity check
   // ofstream CaM_out; 
@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
   const int nx= 3;  const int ny= 3; const int nz= 3;
   const int nn = nx * ny * nz;
 
-  omp_set_num_threads(16);
+//  omp_set_num_threads(16);
 
   //random number seed
   int r = 100;
@@ -114,8 +114,10 @@ int main(int argc, char* argv[]) {
   //init CRecSubcell
   CActionPotential ap;
   RECSUBCELLPARAM param;
-  // param.filenamecp = "cp_out.bin";
-  // param.filenamecpmm = "cpmm_out.bin";
+  param.filenameci = "ci.dat";//record cytosolic Ca2+ (1byte binary 0-255)
+  param.filenamecimm = "cimm.txt";//record max & min values of cytosolic Ca2+
+  param.filenamecnsr = "cnsr.dat";//record (network) SR Ca2+ (1byte binary 0-255)
+  param.filenamecnsrmm = "cnsrmm.txt";//record max & min values of (network) SR Ca2+
   CRecSubcell rec(&sc, &ap, &param);
 
   // get steady state
@@ -125,6 +127,8 @@ int main(int argc, char* argv[]) {
     sc.pace(-80, 5.0);
     if (tn % int(2.0*1000.0/dt) == 0) {
       cout << setprecision(10) << tn * dt / 1000.0 << "\t" << rec.computeavecnsr() << endl;
+      rec.recci(Z_LAYER_AVERAGE);//record cytosolic Ca2+
+      rec.reccnsr(Z_LAYER_AVERAGE);//record (network) SR Ca2+
     }
   }
 
@@ -169,6 +173,8 @@ int main(int argc, char* argv[]) {
 
       if (tn % int(2.0*1000.0/dt) == 0) { 
         cout << setprecision(10) << ttn * dt / 1000.0 << "\t" << rec.computeavecnsr() << endl;
+        rec.recci(Z_LAYER_AVERAGE);//record cytosolic Ca2+
+        rec.reccnsr(Z_LAYER_AVERAGE);//record (network) SR Ca2+
       }
       for (int i = 0; i < nn; i++) {
         aveci[i] += sc.ci[i];
