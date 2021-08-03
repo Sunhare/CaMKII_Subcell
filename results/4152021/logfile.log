@@ -1,0 +1,12 @@
+Start Time : 2021/04/15 (Thu)  17:18:24 -0700 (PDT)
+Host name : c0-2
+OS name and version : Linux   3.13.0-132-generic  #181-Ubuntu SMP Wed Sep 13 13:25:03 UTC 2017
+DISTRIB_ID=Ubuntu
+DISTRIB_RELEASE=16.04
+DISTRIB_CODENAME=xenial
+DISTRIB_DESCRIPTION="Ubuntu 16.04.6 LTS"
+User : bgyoume (UID=1082687, GID=1082687, HOME=/home/bgyoume)
+PID : 31303
+Execute Directory : /home/bgyoume/PTMs/CaMKII_Subcellular
+GNU C/C++ 5.4.0
+OpenMP (201307) : Enabled (Max # of threads = 8)

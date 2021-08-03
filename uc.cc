@@ -32,15 +32,25 @@ int main(int argc, char* argv[]) {
   // CaM_out.open("CaMDyad.txt");
 
   #ifdef ___PTM
+    ofstream CaM_out; 
     ofstream CaMKII_out;
+    ofstream BAR_out;
+    ofstream dydt_CaMKII_out;
+
+    CaM_out.open("CaMDyad.txt");
     CaMKII_out.open("CaMKII_out.txt");
+    dydt_CaMKII_out.open("dydt_CaMKII_out.txt");
+    BAR_out.open("BAR_out.txt");
+    cout << "PTM Simulation" << std::endl;
+  #else
+    cout << "No PTM Simulation" << std::endl;
   #endif
 
   //cell size
   // const int nx=65;  const int ny=27; const int nz=11;
-  // const int nx=10;  const int ny=10; const int nz=10;
+  const int nx=10;  const int ny=10; const int nz=10;
   // const int nx= 5;  const int ny= 5; const int nz= 5;
-  const int nx= 3;  const int ny= 3; const int nz= 3;
+  // const int nx= 3;  const int ny= 3; const int nz= 3;
   const int nn = nx * ny * nz;
 
 //  omp_set_num_threads(16);
@@ -67,7 +77,8 @@ int main(int argc, char* argv[]) {
   sc.NCXalpha = 0.11;
 
 
-  sc.setdt(0.02);
+  // sc.setdt(0.02);
+  sc.setdt(0.001);
   double dt = sc.getdt();
   sc.setKu(5.0);
   sc.setKb(0.005);
@@ -144,7 +155,7 @@ int main(int argc, char* argv[]) {
   }
 
   // int num_sims = 100;
-  int num_sims = 10;
+  int num_sims = 1;
 
   for (int itr = 0; itr < num_sims; itr++) {
     cout << itr << endl;
@@ -167,11 +178,9 @@ int main(int argc, char* argv[]) {
       double t = ttn * dt;
       sc.pace(-80, 12.0);
 
-      // rec.reccp();//Testing reccp(); 
 
 
-
-      if (tn % int(2.0*1000.0/dt) == 0) { 
+      if (tn % int(50.0/dt) == 0) { 
         cout << setprecision(10) << ttn * dt / 1000.0 << "\t" << rec.computeavecnsr() << endl;
         rec.recci(Z_LAYER_AVERAGE);//record cytosolic Ca2+
         rec.reccnsr(Z_LAYER_AVERAGE);//record (network) SR Ca2+
@@ -182,18 +191,90 @@ int main(int argc, char* argv[]) {
         avecp[i] += sc.cp[i];
       }
 
-      #ifdef ___PTM
-        if (tn % int(2.0*1000.0/dt) == 0) {
-          // CaM_out << ttn << "\t" << sc.CaM_dyad[0] << "\t" << sc.dydt_CaMDyad[0] << "\t" << sc.cp[0] << std::endl;
-          // CaM_out << ttn << "\t" << sc.CaM_cyt[0] << "\t" << sc.dydt_CaMCyt[0] << "\t" << sc.ci[0] << std::endl;
-          // CaM_out << ttn << "\t" << sc.CaM_sl[0] << "\t" << sc.dydt_CaMSL[0] << "\t" << sc.cs[0] << std::endl;
+     #ifdef ___PTM
+        // if (tn % int(2.0*1000.0/dt) == 0) {
+      if (tn % int(2.0*1000.0/dt) == 0) {
+          CaM_out << 
+          t                     << "\t" << 
+          sc.cp[0]                << "\t" <<
+          sc.CaM_dyad[0]          << "\t" << 
+          sc.dydt_CaMDyad[0]      << "\t" << 
+          sc.CaM_dyad[0]          << "\t" << 
+          sc.Ca2CaM_dyad[0]       << "\t" << 
+          sc.Ca4CaM_dyad[0]       << "\t" << 
+          sc.CaMB_dyad[0]         << "\t" << 
+          sc.Ca2CaMB_dyad[0]      << "\t" << 
+          sc.Ca4CaMB_dyad[0]      << "\t" << 
+          sc.Pb2_dyad[0]          << "\t" << 
+          sc.Pb_dyad[0]           << "\t" << 
+          sc.Pt_dyad[0]           << "\t" << 
+          sc.Pt2_dyad[0]          << "\t" << 
+          sc.Pa_dyad[0]           << "\t" << 
+          sc.Ca4CaN_dyad[0]       << "\t" << 
+          sc.CaMCa4CaN_dyad[0]    << "\t" << 
+          sc.Ca2CaMCa4CaN_dyad[0] << "\t" << 
+          sc.Ca4CaMCa4CaN_dyad[0] << "\t" << 
+          std::endl;
+
           CaMKII_out << 
-          ttn            << "\t" << //1 
-          sc.RyR_CKp[0]  << "\t" << //2
-          sc.RyR_PKAp[0] << "\t" << //3
-          sc.cp[0]       << "\t" << //4
-          sc.cs[0]       << "\t" << //5
-          sc.ci[0]       << "\t" << //6
+          t                     << "\t" << //1 
+          sc.LCC_PKAp[0]          << "\t" << //2
+          sc.LCC_CKdyadp[0]       << "\t" << //3
+          sc.RyR2809p[0]          << "\t" << //4
+          sc.RyR2815p[0]          << "\t" << //5
+          sc.PLBT17p[0]           << "\t" << //6
+          sc.LCC_CKslp[0]         << "\t" << //7
+          sc.RYR_multiplier[0]    << "\t" << //8
+          std::endl;
+
+          dydt_CaMKII_out <<
+          t               << "\t" << //1 
+          sc.dydt_CaMKII[0] << "\t" << //2
+          sc.dydt_CaMKII[1] << "\t" << //3
+          sc.dydt_CaMKII[2] << "\t" << //4
+          sc.dydt_CaMKII[3] << "\t" << //5
+          sc.dydt_CaMKII[4] << "\t" << //6
+          sc.dydt_CaMKII[5] << "\t" << //7
+          std::endl;
+
+          BAR_out <<
+          t                     << "\t" << //1 
+          sc.L[0]                 << "\t" << //2
+          sc.B1AR[0]              << "\t" << //3
+          sc.Gs[0]                << "\t" << //4
+          sc.B1AR_ACT[0]          << "\t" << //5
+          sc.B1AR_S464[0]         << "\t" << //6
+          sc.B1AR_S301[0]         << "\t" << //7
+          sc.GsaGTPtot[0]         << "\t" << //8
+          sc.GsaGDP[0]            << "\t" << //9
+          sc.GsBy[0]              << "\t" << //10
+          sc.GsaGTP[0]            << "\t" << //11
+          sc.Fsk[0]               << "\t" << //12
+          sc.AC[0]                << "\t" << //13
+          sc.PDE[0]               << "\t" << //14
+          sc.IBMX[0]              << "\t" << //15
+          sc.cAMPtot[0]           << "\t" << //16
+          sc.cAMP[0]              << "\t" << //17
+          sc.PKAC_I[0]            << "\t" << //18
+          sc.PKAC_II[0]           << "\t" << //19
+          sc.PLBp[0]              << "\t" << //20
+          sc.Inhib1ptot[0]        << "\t" << //21
+          sc.Inhib1p[0]           << "\t" << //22
+          sc.PP1[0]               << "\t" << //23
+          sc.LCCa_PKAp_whole[0]   << "\t" << //24
+          sc.LCCb_PKAp_whole[0]   << "\t" << //25
+          sc.RyR_PKAp_whole[0]    << "\t" << //26
+          sc.TnI_PKAp_whole[0]    << "\t" << //27
+          sc.IKs_PKAn[0]          << "\t" << //28
+          sc.Yotiao_KCQN1[0]      << "\t" << //29 
+          sc.IKs_PKAp_whole[0]    << "\t" << //30
+          sc.ICFTR_PKAp_whole[0]  << "\t" << //31
+          sc.PLM_PKAp_whole[0]    << "\t" << //32
+          sc.Myo_PKAp_whole[0]    << "\t" << //33
+          sc.IKr_PKAn[0]          << "\t" << //34
+          sc.Yotiao_hERG[0]       << "\t" << //35
+          sc.IKr_PKAp_whole[0]    << "\t" << //36
+          sc.IClCa_PKAp_whole[0]  << "\t" << //37
           std::endl;
         }
       #endif
@@ -217,7 +298,7 @@ int main(int argc, char* argv[]) {
       prevavecs[i] /= (itr + 1);
       prevavecp[i] = prevavecp[i] * itr + avecp[i] / Tn;
       prevavecp[i] /= (itr + 1);
-      cout << sc.nryr[i] << "\t" << sc.vp[i] << "\t" << sc.Jmaxx[i] << "\t" << prevaveci[i] << "\t" << prevavecs[i] << "\t" << prevavecp[i] << endl;
+      // cout << sc.nryr[i] << "\t" << sc.vp[i] << "\t" << sc.Jmaxx[i] << "\t" << prevaveci[i] << "\t" << prevavecs[i] << "\t" << prevavecp[i] << endl;
       osave << sc.nryr[i] << "\t" << sc.vp[i] << "\t" << sc.Jmaxx[i] << "\t" << prevaveci[i] << "\t" << prevavecs[i] << "\t" << prevavecp[i] << endl;
     }
 

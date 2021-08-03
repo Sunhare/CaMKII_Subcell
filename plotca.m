@@ -1,6 +1,6 @@
 clear all;
-XN=3;
-YN=3;
+XN=10;
+YN=10;
 if (exist('ci.dat.xz')==2)
 system('xz --decompress -k ci.dat.xz');
 end
@@ -72,7 +72,7 @@ end
 
 
 
-comm=['ffmpeg -i tmp.avi -c:v libx264 -vf format=yuv420p -preset placebo -y ca.mp4'];
+comm=['/usr/local/bin/ffmpeg -i tmp.avi -c:v libx264 -vf format=yuv420p -preset placebo -y ca.mp4'];
 system(comm);
 
 if (exist('ca.mp4')==2)

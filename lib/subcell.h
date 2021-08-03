@@ -342,7 +342,7 @@ public:
     void calc_dydt_CaM_SL_ODEs(int id);
     void calc_dydt_CaM_Cyt_ODEs(int id);
     
-    void solve_ODE_CaM(int id);
+    void solve_ODE_CaM(int id, double dtx);
   //* * * * * CaM Variables * * * * * 
 
   //* * * * * CaMKII Variables * * * * *  
@@ -356,7 +356,7 @@ public:
     double *RyR_CKp, *PLB_CKp;
 
     void calc_dydt_CaMKII_ODEs(int id);
-    void solve_ODE_CaMKII(int id);
+    void solve_ODE_CaMKII(int id, double dtx);
   //* * * * * CaMKII Variables * * * * * 
 
   //* * * * * Beta-Adrenergic (B-AR) Variables * * * * *  
@@ -380,7 +380,7 @@ public:
     double *IKr_PKAp, *IClCa_PKAp;
 
     void calc_dydt_BAR_ODEs(int id);
-    void solve_ODE_BAR(int id); 
+    void solve_ODE_BAR(int id, double dtx); 
     //TODO all dydt arrays need to be 2 dimensional (dydt needs to be different for every ID)
 
     //Recording Variables (Sanity Check)

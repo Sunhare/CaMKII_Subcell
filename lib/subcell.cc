@@ -969,22 +969,6 @@ void CSubcell::pace(double v, double nai)
 
     RYR_multiplier[id] = (fCKII_RyR + fPKA_RyR - 1); //Sanity check, check if this is NAN
 
-    // if(id == 50){
-        
-
-    //     std::cout << "dRyR2815p       ["<< id <<"]: " << "\t" << dydt_CaMKII[(id*6)+3]*dt       << std::endl;
-    //     std::cout << "RyR2815p       ["<< id <<"]: " << "\t" << RyR2815p[id]       << std::endl;
-    //     std::cout << "RyR_CKp        ["<< id <<"]: " << "\t" << RyR_CKp[id]        << std::endl;
-    
-    //     // std::cout << "RyR_PKAp_whole ["<< id <<"]: " << "\t" << RyR_PKAp_whole[id] << std::endl;
-    //     // std::cout << "RyR_PKAp       ["<< id <<"]: " << "\t" << RyR_PKAp[id]       << std::endl;
-    
-    //     std::cout << "fCKII_RYR      ["<< id <<"]: " << "\t" << fCKII_RyR          << std::endl;
-    //     std::cout << "fPKA_RyR       ["<< id <<"]: " << "\t" << fPKA_RyR           << std::endl;
-    //     std::cout << "RYR_multiplier ["<< id <<"]: " << "\t" << RYR_multiplier[id] << std::endl;
-    //     std::cout << std::endl;
-    //   }
-
 #endif
 
 
@@ -1101,8 +1085,16 @@ void CSubcell::pace(double v, double nai)
   //Main PTM ODEs
 #ifdef ___PTM
 
+    // TODO
+    // for(int dtx = 0; dtx < 100; dtx++){
+    //   // solve for signaling part with smaller time step
+    //   // check if this works
+    // }
 
-  
+  //Finer Timestep
+
+  for(int dtx = 0; dtx < 100; dtx++){
+
   //CaMKII Equations
     CaMKIIactDyad[id] = CaMKIItotDyad*(Pb_dyad[id]+Pt_dyad[id]+Pt2_dyad[id]+Pa_dyad[id]); // Multiply total by fraction of activated CaMKII states (Pb, Pt, Pt2, Pa)
     CaMKIIactSL[id] = CaMKIItotSL*(Pb_sl[id]+Pt_sl[id]+Pt2_sl[id]+Pa_sl[id]);
@@ -1131,6 +1123,7 @@ void CSubcell::pace(double v, double nai)
     solve_ODE_CaM(id);
     solve_ODE_CaMKII(id);
     solve_ODE_BAR(id);
+  }
 #endif 
 
 #ifdef ___CPDIFF
@@ -3415,59 +3408,59 @@ void CSubcell::calc_dydt_CaM_Cyt_ODEs(int id){
   dydt_CaMCyt[(id*15)+ 13] = dCa2CaMCa4CaN;
   dydt_CaMCyt[(id*15)+ 14] = dCa4CaMCa4CaN;
 }
-void CSubcell::solve_ODE_CaM(int id){
+void CSubcell::solve_ODE_CaM(int id, double dtx){
   // double dydt[]={dCaM,dCa2CaM,dCa4CaM,dCaMB,dCa2CaMB,dCa4CaMB,dPb2,dPb,dPt,dPt2,dPa,dCa4CaN,dCaMCa4CaN,dCa2CaMCa4CaN,dCa4CaMCa4CaN};
   
   //CaM Cytosol
-    CaM_cyt[id]           += dydt_CaMCyt[(id*15) +  0]*dt;
-    Ca2CaM_cyt[id]        += dydt_CaMCyt[(id*15) +  1]*dt;
-    Ca4CaM_cyt[id]        += dydt_CaMCyt[(id*15) +  2]*dt;
-    CaMB_cyt[id]          += dydt_CaMCyt[(id*15) +  3]*dt;
-    Ca2CaMB_cyt[id]       += dydt_CaMCyt[(id*15) +  4]*dt;
-    Ca4CaMB_cyt[id]       += dydt_CaMCyt[(id*15) +  5]*dt;
-    Pb2_cyt[id]           += dydt_CaMCyt[(id*15) +  6]*dt;
-    Pb_cyt[id]            += dydt_CaMCyt[(id*15) +  7]*dt;
-    Pt_cyt[id]            += dydt_CaMCyt[(id*15) +  8]*dt;
-    Pt2_cyt[id]           += dydt_CaMCyt[(id*15) +  9]*dt;
-    Pa_cyt[id]            += dydt_CaMCyt[(id*15) + 10]*dt;
-    Ca4CaN_cyt[id]        += dydt_CaMCyt[(id*15) + 11]*dt;
-    CaMCa4CaN_cyt[id]     += dydt_CaMCyt[(id*15) + 12]*dt;
-    Ca2CaMCa4CaN_cyt[id]  += dydt_CaMCyt[(id*15) + 13]*dt;
-    Ca4CaMCa4CaN_cyt[id]  += dydt_CaMCyt[(id*15) + 14]*dt;
+    CaM_cyt[id]           += dydt_CaMCyt[(id*15) +  0]*dtx;
+    Ca2CaM_cyt[id]        += dydt_CaMCyt[(id*15) +  1]*dtx;
+    Ca4CaM_cyt[id]        += dydt_CaMCyt[(id*15) +  2]*dtx;
+    CaMB_cyt[id]          += dydt_CaMCyt[(id*15) +  3]*dtx;
+    Ca2CaMB_cyt[id]       += dydt_CaMCyt[(id*15) +  4]*dtx;
+    Ca4CaMB_cyt[id]       += dydt_CaMCyt[(id*15) +  5]*dtx;
+    Pb2_cyt[id]           += dydt_CaMCyt[(id*15) +  6]*dtx;
+    Pb_cyt[id]            += dydt_CaMCyt[(id*15) +  7]*dtx;
+    Pt_cyt[id]            += dydt_CaMCyt[(id*15) +  8]*dtx;
+    Pt2_cyt[id]           += dydt_CaMCyt[(id*15) +  9]*dtx;
+    Pa_cyt[id]            += dydt_CaMCyt[(id*15) + 10]*dtx;
+    Ca4CaN_cyt[id]        += dydt_CaMCyt[(id*15) + 11]*dtx;
+    CaMCa4CaN_cyt[id]     += dydt_CaMCyt[(id*15) + 12]*dtx;
+    Ca2CaMCa4CaN_cyt[id]  += dydt_CaMCyt[(id*15) + 13]*dtx;
+    Ca4CaMCa4CaN_cyt[id]  += dydt_CaMCyt[(id*15) + 14]*dtx;
   //CaM Sarcolemmal
 
-    CaM_sl[id]            += dydt_CaMSL[(id*15) +  0]*dt;
-    Ca2CaM_sl[id]         += dydt_CaMSL[(id*15) +  1]*dt;
-    Ca4CaM_sl[id]         += dydt_CaMSL[(id*15) +  2]*dt;
-    CaMB_sl[id]           += dydt_CaMSL[(id*15) +  3]*dt;
-    Ca2CaMB_sl[id]        += dydt_CaMSL[(id*15) +  4]*dt;
-    Ca4CaMB_sl[id]        += dydt_CaMSL[(id*15) +  5]*dt;
-    Pb2_sl[id]            += dydt_CaMSL[(id*15) +  6]*dt;
-    Pb_sl[id]             += dydt_CaMSL[(id*15) +  7]*dt;
-    Pt_sl[id]             += dydt_CaMSL[(id*15) +  8]*dt;
-    Pt2_sl[id]            += dydt_CaMSL[(id*15) +  9]*dt;
-    Pa_sl[id]             += dydt_CaMSL[(id*15) + 10]*dt;
-    Ca4CaN_sl[id]         += dydt_CaMSL[(id*15) + 11]*dt;
-    CaMCa4CaN_sl[id]      += dydt_CaMSL[(id*15) + 12]*dt;
-    Ca2CaMCa4CaN_sl[id]   += dydt_CaMSL[(id*15) + 13]*dt;
-    Ca4CaMCa4CaN_sl[id]   += dydt_CaMSL[(id*15) + 14]*dt;
+    CaM_sl[id]            += dydt_CaMSL[(id*15) +  0]*dtx;
+    Ca2CaM_sl[id]         += dydt_CaMSL[(id*15) +  1]*dtx;
+    Ca4CaM_sl[id]         += dydt_CaMSL[(id*15) +  2]*dtx;
+    CaMB_sl[id]           += dydt_CaMSL[(id*15) +  3]*dtx;
+    Ca2CaMB_sl[id]        += dydt_CaMSL[(id*15) +  4]*dtx;
+    Ca4CaMB_sl[id]        += dydt_CaMSL[(id*15) +  5]*dtx;
+    Pb2_sl[id]            += dydt_CaMSL[(id*15) +  6]*dtx;
+    Pb_sl[id]             += dydt_CaMSL[(id*15) +  7]*dtx;
+    Pt_sl[id]             += dydt_CaMSL[(id*15) +  8]*dtx;
+    Pt2_sl[id]            += dydt_CaMSL[(id*15) +  9]*dtx;
+    Pa_sl[id]             += dydt_CaMSL[(id*15) + 10]*dtx;
+    Ca4CaN_sl[id]         += dydt_CaMSL[(id*15) + 11]*dtx;
+    CaMCa4CaN_sl[id]      += dydt_CaMSL[(id*15) + 12]*dtx;
+    Ca2CaMCa4CaN_sl[id]   += dydt_CaMSL[(id*15) + 13]*dtx;
+    Ca4CaMCa4CaN_sl[id]   += dydt_CaMSL[(id*15) + 14]*dtx;
   
   //CaM Dyad/Cleft space
-    CaM_dyad[id]          += dydt_CaMDyad[(id*15)+  0]*dt;
-    Ca2CaM_dyad[id]       += dydt_CaMDyad[(id*15)+  1]*dt;
-    Ca4CaM_dyad[id]       += dydt_CaMDyad[(id*15)+  2]*dt;
-    CaMB_dyad[id]         += dydt_CaMDyad[(id*15)+  3]*dt;
-    Ca2CaMB_dyad[id]      += dydt_CaMDyad[(id*15)+  4]*dt;
-    Ca4CaMB_dyad[id]      += dydt_CaMDyad[(id*15)+  5]*dt;
-    Pb2_dyad[id]          += dydt_CaMDyad[(id*15)+  6]*dt;
-    Pb_dyad[id]           += dydt_CaMDyad[(id*15)+  7]*dt;
-    Pt_dyad[id]           += dydt_CaMDyad[(id*15)+  8]*dt;
-    Pt2_dyad[id]          += dydt_CaMDyad[(id*15)+  9]*dt;
-    Pa_dyad[id]           += dydt_CaMDyad[(id*15)+ 10]*dt;
-    Ca4CaN_dyad[id]       += dydt_CaMDyad[(id*15)+ 11]*dt;
-    CaMCa4CaN_dyad[id]    += dydt_CaMDyad[(id*15)+ 12]*dt;
-    Ca2CaMCa4CaN_dyad[id] += dydt_CaMDyad[(id*15)+ 13]*dt;
-    Ca4CaMCa4CaN_dyad[id] += dydt_CaMDyad[(id*15)+ 14]*dt;
+    CaM_dyad[id]          += dydt_CaMDyad[(id*15)+  0]*dtx;
+    Ca2CaM_dyad[id]       += dydt_CaMDyad[(id*15)+  1]*dtx;
+    Ca4CaM_dyad[id]       += dydt_CaMDyad[(id*15)+  2]*dtx;
+    CaMB_dyad[id]         += dydt_CaMDyad[(id*15)+  3]*dtx;
+    Ca2CaMB_dyad[id]      += dydt_CaMDyad[(id*15)+  4]*dtx;
+    Ca4CaMB_dyad[id]      += dydt_CaMDyad[(id*15)+  5]*dtx;
+    Pb2_dyad[id]          += dydt_CaMDyad[(id*15)+  6]*dtx;
+    Pb_dyad[id]           += dydt_CaMDyad[(id*15)+  7]*dtx;
+    Pt_dyad[id]           += dydt_CaMDyad[(id*15)+  8]*dtx;
+    Pt2_dyad[id]          += dydt_CaMDyad[(id*15)+  9]*dtx;
+    Pa_dyad[id]           += dydt_CaMDyad[(id*15)+ 10]*dtx;
+    Ca4CaN_dyad[id]       += dydt_CaMDyad[(id*15)+ 11]*dtx;
+    CaMCa4CaN_dyad[id]    += dydt_CaMDyad[(id*15)+ 12]*dtx;
+    Ca2CaMCa4CaN_dyad[id] += dydt_CaMDyad[(id*15)+ 13]*dtx;
+    Ca4CaMCa4CaN_dyad[id] += dydt_CaMDyad[(id*15)+ 14]*dtx;
 }
 
 
@@ -3563,6 +3556,23 @@ void CSubcell::calc_dydt_CaMKII_ODEs(int id)
   double PLB_DEPHOS = (k_pp1PLB*PP1_PLB*PLBT17p[id])/(KmPP1_PLB+PLBT17p[id])*OA_PP1;
   double dPLBT17p = PLB_PHOS - PLB_DEPHOS; 
 
+  if(id == 0){
+   printf(
+      "PLB_PHOS: %f\tk_ckPLB: %f\tPLBT17n: %f\t CaMKIIactDyad[id]: %f\tKmCK_PLB: %f\tk_ckPLB[id]: %f\tPLB_DEPHOS: %f\tk_pp1PLB: %f\tPP1_PLB: %f\tPLBT17p[id]: %f\tKmPP1_PLB: %f\tOA_PP1: %f\t\n", 
+      PLB_PHOS,  
+      k_ckPLB, 
+      PLBT17n,
+      CaMKIIactDyad[id],
+      KmCK_PLB,
+      k_ckPLB,
+      PLB_DEPHOS,
+      k_pp1PLB,
+      PP1_PLB,
+      PLBT17p[id],
+      KmPP1_PLB,
+      OA_PP1);
+
+  }
   
   //// Collect ODEs and convert to uM/ms
   dydt_CaMKII[(id*6) + 0] = dLCC_PKAp*1e-3;
@@ -3573,13 +3583,13 @@ void CSubcell::calc_dydt_CaMKII_ODEs(int id)
   dydt_CaMKII[(id*6) + 5] = dLCC_CKslp*1e-3;
 
 }
-void CSubcell::solve_ODE_CaMKII(int id){
-  LCC_PKAp[id]    += dydt_CaMKII[(id*6)+0]*dt; //unused
-  LCC_CKdyadp[id] += dydt_CaMKII[(id*6)+1]*dt;
-  RyR2809p[id]    += dydt_CaMKII[(id*6)+2]*dt; //unused
-  RyR2815p[id]    += dydt_CaMKII[(id*6)+3]*dt;
-  PLBT17p[id]     += dydt_CaMKII[(id*6)+4]*dt;
-  LCC_CKslp[id]   += dydt_CaMKII[(id*6)+5]*dt;
+void CSubcell::solve_ODE_CaMKII(int id, double dtx){
+  LCC_PKAp[id]    += dydt_CaMKII[(id*6)+0]*dtx; //unused
+  LCC_CKdyadp[id] += dydt_CaMKII[(id*6)+1]*dtx;
+  RyR2809p[id]    += dydt_CaMKII[(id*6)+2]*dtx; //unused
+  RyR2815p[id]    += dydt_CaMKII[(id*6)+3]*dtx;
+  PLBT17p[id]     += dydt_CaMKII[(id*6)+4]*dtx;
+  LCC_CKslp[id]   += dydt_CaMKII[(id*6)+5]*dtx;
 }
 
 void CSubcell::calc_dydt_BAR_ODEs(int id){
@@ -3999,43 +4009,43 @@ void CSubcell::calc_dydt_BAR_ODEs(int id){
   dydt_BAR[(id*36)+ 34] = dIKr_PKAp_whole;
   dydt_BAR[(id*36)+ 35] = dIClCa_PKAp_whole;
 }
-void CSubcell::solve_ODE_BAR(int id){
-  L[id]                   += dydt_BAR[ (id*36) +  0]*dt;
-  B1AR[id]                += dydt_BAR[ (id*36) +  1]*dt;   
-  Gs[id]                  += dydt_BAR[ (id*36) +  2]*dt; 
-  B1AR_ACT[id]            += dydt_BAR[ (id*36) +  3]*dt;       
-  B1AR_S464[id]           += dydt_BAR[ (id*36) +  4]*dt;        
-  B1AR_S301[id]           += dydt_BAR[ (id*36) +  5]*dt;        
-  GsaGTPtot[id]           += dydt_BAR[ (id*36) +  6]*dt;        
-  GsaGDP[id]              += dydt_BAR[ (id*36) +  7]*dt;     
-  GsBy[id]                += dydt_BAR[ (id*36) +  8]*dt;   
-  GsaGTP[id]              += dydt_BAR[ (id*36) +  9]*dt;     
-  Fsk[id]                 += dydt_BAR[ (id*36) + 10]*dt; 
-  AC[id]                  += dydt_BAR[ (id*36) + 11]*dt;
-  PDE[id]                 += dydt_BAR[ (id*36) + 12]*dt; 
-  IBMX[id]                += dydt_BAR[ (id*36) + 13]*dt;  
-  cAMPtot[id]             += dydt_BAR[ (id*36) + 14]*dt;     
-  cAMP[id]                += dydt_BAR[ (id*36) + 15]*dt;  
-  PKAC_I[id]              += dydt_BAR[ (id*36) + 16]*dt;    
-  PKAC_II[id]             += dydt_BAR[ (id*36) + 17]*dt;     
-  PLBp[id]                += dydt_BAR[ (id*36) + 18]*dt;  
-  Inhib1ptot[id]          += dydt_BAR[ (id*36) + 19]*dt;        
-  Inhib1p[id]             += dydt_BAR[ (id*36) + 20]*dt;     
-  PP1[id]                 += dydt_BAR[ (id*36) + 21]*dt; 
-  LCCa_PKAp_whole[id]     += dydt_BAR[ (id*36) + 22]*dt;             
-  LCCb_PKAp_whole[id]     += dydt_BAR[ (id*36) + 23]*dt;             
-  RyR_PKAp_whole[id]      += dydt_BAR[ (id*36) + 24]*dt;            
-  TnI_PKAp_whole[id]      += dydt_BAR[ (id*36) + 25]*dt;            
-  IKs_PKAn[id]            += dydt_BAR[ (id*36) + 26]*dt;      
-  Yotiao_KCQN1[id]        += dydt_BAR[ (id*36) + 27]*dt;          
-  IKs_PKAp_whole[id]      += dydt_BAR[ (id*36) + 28]*dt;            
-  ICFTR_PKAp_whole[id]    += dydt_BAR[ (id*36) + 29]*dt;              
-  PLM_PKAp_whole[id]      += dydt_BAR[ (id*36) + 30]*dt;            
-  Myo_PKAp_whole[id]      += dydt_BAR[ (id*36) + 31]*dt;            
-  IKr_PKAn[id]            += dydt_BAR[ (id*36) + 32]*dt;      
-  Yotiao_hERG[id]         += dydt_BAR[ (id*36) + 33]*dt;         
-  IKr_PKAp_whole[id]      += dydt_BAR[ (id*36) + 34]*dt;            
-  IClCa_PKAp_whole[id]    += dydt_BAR[ (id*36) + 35]*dt;              
+void CSubcell::solve_ODE_BAR(int id, double dtx){
+  L[id]                   += dydt_BAR[ (id*36) +  0]*dtx;
+  B1AR[id]                += dydt_BAR[ (id*36) +  1]*dtx;   
+  Gs[id]                  += dydt_BAR[ (id*36) +  2]*dtx; 
+  B1AR_ACT[id]            += dydt_BAR[ (id*36) +  3]*dtx;       
+  B1AR_S464[id]           += dydt_BAR[ (id*36) +  4]*dtx;        
+  B1AR_S301[id]           += dydt_BAR[ (id*36) +  5]*dtx;        
+  GsaGTPtot[id]           += dydt_BAR[ (id*36) +  6]*dtx;        
+  GsaGDP[id]              += dydt_BAR[ (id*36) +  7]*dtx;     
+  GsBy[id]                += dydt_BAR[ (id*36) +  8]*dtx;   
+  GsaGTP[id]              += dydt_BAR[ (id*36) +  9]*dtx;     
+  Fsk[id]                 += dydt_BAR[ (id*36) + 10]*dtx; 
+  AC[id]                  += dydt_BAR[ (id*36) + 11]*dtx;
+  PDE[id]                 += dydt_BAR[ (id*36) + 12]*dtx; 
+  IBMX[id]                += dydt_BAR[ (id*36) + 13]*dtx;  
+  cAMPtot[id]             += dydt_BAR[ (id*36) + 14]*dtx;     
+  cAMP[id]                += dydt_BAR[ (id*36) + 15]*dtx;  
+  PKAC_I[id]              += dydt_BAR[ (id*36) + 16]*dtx;    
+  PKAC_II[id]             += dydt_BAR[ (id*36) + 17]*dtx;     
+  PLBp[id]                += dydt_BAR[ (id*36) + 18]*dtx;  
+  Inhib1ptot[id]          += dydt_BAR[ (id*36) + 19]*dtx;        
+  Inhib1p[id]             += dydt_BAR[ (id*36) + 20]*dtx;     
+  PP1[id]                 += dydt_BAR[ (id*36) + 21]*dtx; 
+  LCCa_PKAp_whole[id]     += dydt_BAR[ (id*36) + 22]*dtx;             
+  LCCb_PKAp_whole[id]     += dydt_BAR[ (id*36) + 23]*dtx;             
+  RyR_PKAp_whole[id]      += dydt_BAR[ (id*36) + 24]*dtx;            
+  TnI_PKAp_whole[id]      += dydt_BAR[ (id*36) + 25]*dtx;            
+  IKs_PKAn[id]            += dydt_BAR[ (id*36) + 26]*dtx;      
+  Yotiao_KCQN1[id]        += dydt_BAR[ (id*36) + 27]*dtx;          
+  IKs_PKAp_whole[id]      += dydt_BAR[ (id*36) + 28]*dtx;            
+  ICFTR_PKAp_whole[id]    += dydt_BAR[ (id*36) + 29]*dtx;              
+  PLM_PKAp_whole[id]      += dydt_BAR[ (id*36) + 30]*dtx;            
+  Myo_PKAp_whole[id]      += dydt_BAR[ (id*36) + 31]*dtx;            
+  IKr_PKAn[id]            += dydt_BAR[ (id*36) + 32]*dtx;      
+  Yotiao_hERG[id]         += dydt_BAR[ (id*36) + 33]*dtx;         
+  IKr_PKAp_whole[id]      += dydt_BAR[ (id*36) + 34]*dtx;            
+  IClCa_PKAp_whole[id]    += dydt_BAR[ (id*36) + 35]*dtx;              
 }
 
 double CSubcell::computeave_RyRp_Multiplier(void)
